@@ -98,7 +98,7 @@
 
     <div class="tog">
       <input type="checkbox" id="togAIS" />
-      <label for="togAIS">Posisi Kapal (AIS — banyak kapal per klaster + auto-fly)</label>
+      <label for="togAIS">Posisi Kapal (AIS — multi-klaster + auto-fly)</label>
     </div>
 
     <div class="tog">
@@ -110,7 +110,7 @@
   <!-- DATA -->
   <div id="paneData" class="section" role="tabpanel" aria-labelledby="tabData" hidden>
     <h2>Sumber Data & Preset</h2>
-    <div class="sub">Gunakan preset / URL sendiri. Jika kosong, sistem pakai <b>dummy</b>.</div>
+    <div class="sub">Kosongkan untuk pakai <b>dummy</b> bila tersedia (AIS & Zonasi).</div>
 
     <div style="margin-top:8px">
       <h3 style="font-size:13px;margin:0 0 6px;color:#bcd6ff">Global Fishing Watch</h3>
@@ -161,7 +161,7 @@
         <button id="wmsAdd">Tambah / Ganti</button>
         <button id="wmsClear" class="btn-ghost">Hapus Semua</button>
       </div>
-      <p class="note">Jika kosong, lewati saja (tanpa dummy untuk WMS).</p>
+      <p class="note">Jika kosong, lewati (tidak ada dummy untuk WMS).</p>
     </div>
 
     <div style="height:10px"></div>
@@ -181,8 +181,7 @@
   <!-- TENTANG -->
   <div id="paneTentang" class="section" role="tabpanel" aria-labelledby="tabTentang" hidden>
     <h2>Tentang</h2>
-    <p class="note"><b>SITARLAUT 3D</b> — platform 3D untuk perencanaan & pengelolaan tata ruang laut. Mendukung konsep <b>Digital Twin</b> (layer berbasis waktu) dan integrasi data GFW, Copernicus, serta AIS.</p>
-    <p class="note">Gunakan tab <b>Layer</b> untuk menyalakan/mematikan; tab <b>Data</b> untuk preset/URL.</p>
+    <p class="note"><b>SITARLAUT 3D</b> — platform 3D untuk perencanaan & pengelolaan tata ruang laut. Mendukung <b>Digital Twin</b> (layer berbasis waktu) serta integrasi GFW, Copernicus, dan AIS.</p>
   </div>
 </div>
 
@@ -193,59 +192,97 @@
   const $ = (id)=>document.getElementById(id);
   const setStatus = (t)=>{ $('status').textContent = 'Status: ' + t; console.log('[SITARLAUT]', t); };
 
-  // Tabs
-  const tabs = [
-    {tab:'tabLayers', pane:'paneLayers'},
-    {tab:'tabData', pane:'paneData'},
-    {tab:'tabTentang', pane:'paneTentang'},
-  ];
-  tabs.forEach(({tab,pane})=>{
-    $(tab).onclick = ()=>{
-      tabs.forEach(({tab:tb,pane:pn})=>{
-        $(tb).classList.toggle('active', tb===tab);
-        $(pn).hidden = pn!==pane;
-      });
-    };
-  });
-
-  // ===== Cesium init (token disisipkan di kode)
+  // === Token Ion: milik Anda, disisipkan di kode (tidak tampil di UI)
   Cesium.Ion.defaultAccessToken =
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4MGZjYmVlNC01MDEwLTQ3M2ItYTU0Mi00NTljZDMwYTdhYTMiLCJpZCI6NzU1MiwiaWF0IjoxNzYyMjY3NjI0fQ._x11gbiK3ozL9DYz1WVGQDruICGCuTuhZXAglQQh7ZQ';
+
+  // === Fallback helpers (untuk kasus blank)
+  async function safeWorldTerrain() {
+    try {
+      return Cesium.Terrain.fromWorldTerrain();
+    } catch (e) {
+      console.warn('[terrain]', e.message);
+      return new Cesium.EllipsoidTerrain();
+    }
+  }
+  function useOSMBase(viewer){
+    const il = viewer.imageryLayers;
+    while (il.length) il.remove(il.get(0), true);
+    const prov = new Cesium.UrlTemplateImageryProvider({
+      url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      credit: '© OpenStreetMap contributors',
+      minimumLevel: 0, maximumLevel: 19
+    });
+    il.add(new Cesium.ImageryLayer(prov));
+  }
 
   const SHIP_ICON = 'https://e7.pngegg.com/pngimages/926/856/png-clipart-boating-yacht-boat-show-ship-boat-top-view-electronics-watch-accessory.png';
 
   let viewer, osmBuildings, gfwLayer, mspDS, aisBillboards=null, aisTimer=null, wmsLayers=[];
   let aisHasFlown = false;
 
-  function boot(){
-    viewer = new Cesium.Viewer('map',{
-      animation:false, timeline:false, geocoder:true, baseLayerPicker:true, sceneModePicker:true,
-      terrain: Cesium.Terrain.fromWorldTerrain(),
-      infoBox:true, selectionIndicator:true
-    });
-    viewer.scene.globe.enableLighting = true;
-
-    // Fokus awal Indonesia
-    viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(117, -2, 5_000_000) });
-
-    // Auto-add OSM Buildings
+  async function boot(){
     try{
-      osmBuildings = Cesium.createOsmBuildings();
-      viewer.scene.primitives.add(osmBuildings);
-      $('togOSMB').checked = true;
-      setStatus('OSM Buildings aktif. Gunakan tombol Fly untuk melihat jelas.');
-    }catch(e){
-      console.error(e);
-      setStatus('Gagal memuat OSM Buildings. Cek token/jaringan.');
-    }
+      const terrain = await safeWorldTerrain();
+      viewer = new Cesium.Viewer('map',{
+        animation:false, timeline:false, geocoder:true, baseLayerPicker:false, sceneModePicker:true,
+        terrain, infoBox:true, selectionIndicator:true
+      });
 
-    // Toggle layer
+      // Coba biarkan default basemap (Bing lewat Ion). Kalau gagal → OSM raster.
+      try {
+        // no-op: kalau sukses, biarkan default
+      } catch (e) {
+        console.warn('[basemap]', e.message);
+        useOSMBase(viewer);
+      }
+
+      // Fokus awal Indonesia
+      viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(117, -2, 5_000_000) });
+
+      // Tambahkan titik uji (cek WebGL)
+      viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(106.845, -6.2146), point:{pixelSize:6, color:Cesium.Color.CYAN}});
+
+      // OSM Buildings auto-ON
+      try{
+        osmBuildings = Cesium.createOsmBuildings();
+        viewer.scene.primitives.add(osmBuildings);
+        setStatus('OSM Buildings aktif. Gunakan tombol Fly untuk melihat jelas.');
+      }catch(e){
+        console.warn('OSM Buildings gagal:', e);
+      }
+
+      wiring();
+      setStatus('Siap. Gunakan Layer/Data di panel kiri.');
+    }catch(err){
+      console.error('[init fatal]', err);
+      alert('Gagal inisialisasi Cesium. Buka Console (F12) untuk detail. Jalankan lewat http server, bukan file://');
+    }
+  }
+
+  function wiring(){
+    // Tab switching
+    const tabs = [
+      {tab:'tabLayers', pane:'paneLayers'},
+      {tab:'tabData', pane:'paneData'},
+      {tab:'tabTentang', pane:'paneTentang'},
+    ];
+    tabs.forEach(({tab,pane})=>{
+      $(tab).onclick = ()=>{
+        tabs.forEach(({tab:tb,pane:pn})=>{
+          $(tb).classList.toggle('active', tb===tab);
+          $(pn).hidden = pn!==pane;
+        });
+      };
+    });
+
+    // LAYER toggles
     $('togOSMB').addEventListener('change', onToggleOSMB);
     $('togGFW').addEventListener('change', onToggleGFW);
     $('togAIS').addEventListener('change', onToggleAIS);
     $('togMSP').addEventListener('change', onToggleMSP);
 
-    // Data actions
+    // DATA actions
     $('gfwApply').onclick = enableOrSwapGFW;
     $('gfwOff').onclick = ()=>{ if(gfwLayer){ viewer.imageryLayers.remove(gfwLayer); gfwLayer=null; } $('togGFW').checked=false; setStatus('GFW dimatikan.'); };
 
@@ -274,10 +311,8 @@
       };
       const t = targets[where]||targets.priok;
       viewer.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(t.lon, t.lat, t.h), duration: 1.6 });
-      setStatus('Pindah kamera ke area pelabuhan. Zoom dekati untuk melihat gedung.');
+      setStatus('Pindah kamera ke area pelabuhan.');
     };
-
-    setStatus('Siap. Gunakan Layer/Data di panel kiri.');
   }
 
   // ===== OSM Buildings
@@ -346,32 +381,25 @@
     setStatus('Semua layer WMS/WMTS dihapus.');
   }
 
-  // ===== AIS (dummy banyak kapal per klaster + bergerak) =====
+  // ===== AIS dummy banyak kapal per klaster =====
   const SHIP_IMG = SHIP_ICON;
-
-  // Pusat klaster: Kalimantan (pakai Balikpapan), Jakarta-Priok, Surabaya-Perak, Makassar
   const CLUSTERS = [
-    { name:'Kalimantan (Balikpapan)', lon:116.85, lat:-1.27,  spreadKm:20, count:12 },
+    { name:'Kalimantan (Balikpapan)', lon:116.85,  lat:-1.27,  spreadKm:20, count:12 },
     { name:'Jakarta (Tj. Priok)',     lon:106.884, lat:-6.109, spreadKm:15, count:12 },
     { name:'Surabaya (Tj. Perak)',    lon:112.737, lat:-7.200, spreadKm:15, count:12 },
     { name:'Makassar (S. Hatta)',     lon:119.418, lat:-5.125, spreadKm:15, count:12 }
   ];
-
-  let DEMO_SHIPS = []; // akan di-seed saat start
-  let aisHasFlown = false;
-
+  let DEMO_SHIPS = [];
   function degPerKmLat(){ return 1/110.574; }
   function degPerKmLon(latDeg){ return 1/(111.320 * Math.cos(latDeg*Math.PI/180)); }
-
   function randomInRange(a,b){ return a + Math.random()*(b-a); }
-
   function seedDemoShips(){
     DEMO_SHIPS = [];
     for (const c of CLUSTERS){
       const dLat = degPerKmLat();
       const dLon = degPerKmLon(c.lat);
       for (let i=0;i<c.count;i++){
-        const r = c.spreadKm * Math.sqrt(Math.random());  // distribusi lebih rapat di pusat
+        const r = c.spreadKm * Math.sqrt(Math.random());
         const t = Math.random()*Math.PI*2;
         const offLat = r * Math.sin(t) * dLat;
         const offLon = r * Math.cos(t) * dLon;
@@ -380,45 +408,31 @@
           lon: c.lon + offLon,
           lat: c.lat + offLat,
           course: randomInRange(0,360),
-          speed: randomInRange(6,15)   // “knot” simulatif
+          speed: randomInRange(6,15)
         });
       }
     }
   }
-
   function updateShipMotion(){
-    // Ubah posisi sedikit berdasarkan course+speed (simulasi sederhana)
-    // 1 knot ≈ 0.00051444 km/detik. Kita pakai dt ≈ 2 detik per tick (lihat interval)
-    // Konversi km -> derajat:
-    const dt = 2; // detik
+    const dt = 2; // detik per tick
     DEMO_SHIPS = DEMO_SHIPS.map(v=>{
-      const speedKts = v.speed;
-      const kmps = speedKts * 1.852 / 3600; // km/s
-      const dist = kmps * dt;               // km per tick
+      const kmps = (v.speed * 1.852) / 3600;
+      const dist = kmps * dt;
       const dir = v.course * Math.PI/180;
-      const dNorth = Math.cos(dir)*dist; // km ke utara
-      const dEast  = Math.sin(dir)*dist; // km ke timur
+      const dNorth = Math.cos(dir)*dist;
+      const dEast  = Math.sin(dir)*dist;
       const dLat = dNorth * degPerKmLat();
       const dLon = dEast  * degPerKmLon(v.lat);
-
-      let lon = v.lon + dLon;
-      let lat = v.lat + dLat;
-
-      // Sedikit noise arah agar tidak terlalu kaku
-      let course = (v.course + randomInRange(-2,2) + 360) % 360;
-
+      const lon = v.lon + dLon;
+      const lat = v.lat + dLat;
+      const course = (v.course + randomInRange(-2,2) + 360) % 360;
       return {...v, lon, lat, course};
     });
   }
-
   function onToggleAIS(e){ if (e.target.checked) startAIS(); else stopAIS(); }
-
-  let aisBillboards=null, aisTimer=null;
-
   function ensureAisLayer(){
     if (!aisBillboards){ aisBillboards = viewer.scene.primitives.add(new Cesium.BillboardCollection()); }
   }
-
   function drawShips(ships){
     ensureAisLayer();
     aisBillboards.removeAll();
@@ -426,14 +440,13 @@
       aisBillboards.add({
         position: Cesium.Cartesian3.fromDegrees(v.lon, v.lat),
         image: SHIP_IMG,
-        scale: 0.1, // ikon besar → skala kecil
+        scale: 0.1,
         verticalOrigin: Cesium.VerticalOrigin.CENTER,
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
         disableDepthTestDistance: Number.POSITIVE_INFINITY
       });
     }
   }
-
   function flyToAISExtent(ships){
     let minLon=+Infinity, minLat=+Infinity, maxLon=-Infinity, maxLat=-Infinity;
     ships.forEach(s=>{
@@ -446,9 +459,7 @@
     const centerLat = ((minLat+maxLat)/2).toFixed(3);
     setStatus(`AIS aktif (≈${ships.length} kapal) — pusat area: lat ${centerLat}, lon ${centerLon}.`);
   }
-
   async function fetchAISOnce(){
-    // Mode dummy multi-klaster (tanpa endpoint)
     updateShipMotion();
     drawShips(DEMO_SHIPS);
     if (!aisHasFlown && DEMO_SHIPS.length){
@@ -458,17 +469,15 @@
       setStatus(`Demo AIS berjalan — total kapal: ${DEMO_SHIPS.length}.`);
     }
   }
-
   function startAIS(){
     aisHasFlown = false;
-    seedDemoShips();      // spawn ulang banyak kapal di 4 klaster
-    fetchAISOnce();       // gambar pertama
-    stopAIS();            // pastikan tidak dobel interval
-    aisTimer = setInterval(fetchAISOnce, 2000); // gerak tiap 2 detik
+    seedDemoShips();
+    fetchAISOnce();
+    stopAIS(); // bersihkan interval lama jika ada
+    aisTimer = setInterval(fetchAISOnce, 2000);
     $('togAIS').checked = true;
     setStatus('AIS (dummy multi-klaster) berjalan dan akan auto-fly.');
   }
-
   function stopAIS(){
     if (aisTimer){ clearInterval(aisTimer); aisTimer=null; }
     if (aisBillboards){ aisBillboards.removeAll(); }
@@ -476,7 +485,7 @@
     setStatus('AIS dimatikan.');
   }
 
-  // ===== MSP Zonasi (dummy kalau URL kosong)
+  // ===== MSP Zonasi (dummy bila URL kosong)
   const DUMMY_ZONASI = {
     "type":"FeatureCollection",
     "features":[
@@ -514,11 +523,7 @@
           ent.polyline.material = col;
           ent.polyline.width = 3;
         }
-        ent.description = `
-          <b>${p.nama||'Zonasi'}</b><br/>
-          Jenis: ${p.jenis||'-'}<br/>
-          Koordinat: otomatis
-        `;
+        ent.description = `<b>${p.nama||'Zonasi'}</b><br/>Jenis: ${p.jenis||'-'}`;
       });
 
       viewer.dataSources.add(mspDS);
@@ -527,7 +532,7 @@
       setStatus(url ? 'Zonasi MSP dimuat dari URL.' : 'Zonasi MSP dummy dimuat.');
     }catch(e){
       console.error(e);
-      alert('Gagal memuat zonasi. Pastikan URL/CORS.'); 
+      alert('Gagal memuat zonasi. Pastikan URL/CORS.');
     }
   }
   function clearMSP(){
@@ -540,8 +545,13 @@
     else{ clearMSP(); }
   }
 
-  // Start
+  // ===== Mulai
   boot();
+
+  // ===== Tips bila blank:
+  // - Jalankan via server lokal (python/node), bukan file://
+  // - Cek Console (F12) untuk error CORS/Token
+  // - Jika jaringan kantor blok CDN, host Cesium & widgets.css secara lokal
 })();
 </script>
 </body>
