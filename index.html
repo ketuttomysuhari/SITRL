@@ -57,7 +57,7 @@
   <img src="https://cdn.jsdelivr.net/gh/tabler/tabler-icons/icons/shield.svg" alt="Lambang" aria-hidden="true">
   <div>
     <h1>SITARLAUT 3D</h1>
-    <small>Sistem Informasi Tata Ruang Laut — Pemerintah</small>
+    <small>Sistem Informasi Tata Ruang Laut</small>
   </div>
 </div>
 
@@ -98,7 +98,7 @@
 
     <div class="tog">
       <input type="checkbox" id="togAIS" />
-      <label for="togAIS">Posisi Kapal (AIS — demo bergerak)</label>
+      <label for="togAIS">Posisi Kapal (AIS — demo bergerak + auto-fly)</label>
     </div>
 
     <div class="tog">
@@ -212,7 +212,11 @@
   Cesium.Ion.defaultAccessToken =
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4MGZjYmVlNC01MDEwLTQ3M2ItYTU0Mi00NTljZDMwYTdhYTMiLCJpZCI6NzU1MiwiaWF0IjoxNzYyMjY3NjI0fQ._x11gbiK3ozL9DYz1WVGQDruICGCuTuhZXAglQQh7ZQ';
 
+  const SHIP_ICON = 'https://e7.pngegg.com/pngimages/926/856/png-clipart-boating-yacht-boat-show-ship-boat-top-view-electronics-watch-accessory.png';
+
   let viewer, osmBuildings, gfwLayer, mspDS, aisBillboards=null, aisTimer=null, wmsLayers=[];
+  let aisHasFlown = false; // fly sekali saat AIS mulai
+
   function boot(){
     viewer = new Cesium.Viewer('map',{
       animation:false, timeline:false, geocoder:true, baseLayerPicker:true, sceneModePicker:true,
@@ -344,16 +348,41 @@
     setStatus('Semua layer WMS/WMTS dihapus.');
   }
 
-  // ===== AIS (dummy bergerak atau dari endpoint jika ada)
+  // ===== AIS (dummy bergerak atau dari endpoint jika ada) =====
+  // Ikon kapal sesuai permintaan (top view)
+  const SHIP_IMG = SHIP_ICON;
+
   let DEMO_SHIPS = [
     { name:'KM Nusantara', lon:117.10, lat:-0.80, course:45, speed:12 },
     { name:'MV Samudra',   lon:115.90, lat:-1.50, course:90, speed:10 },
     { name:'MT LautBiru',  lon:119.20, lat:-2.10, course:12, speed:14 }
   ];
+
   function onToggleAIS(e){ if (e.target.checked) startAIS(); else stopAIS(); }
   function ensureAisLayer(){
     if (!aisBillboards){ aisBillboards = viewer.scene.primitives.add(new Cesium.BillboardCollection()); }
   }
+
+  function flyToAISExtent(ships){
+    if (!ships.length) return;
+    // Hitung bounding dan pusat
+    let minLon=+Infinity, minLat=+Infinity, maxLon=-Infinity, maxLat=-Infinity;
+    ships.forEach(s=>{
+      minLon = Math.min(minLon, s.lon); maxLon = Math.max(maxLon, s.lon);
+      minLat = Math.min(minLat, s.lat); maxLat = Math.max(maxLat, s.lat);
+    });
+    const centerLon = (minLon+maxLon)/2;
+    const centerLat = (minLat+maxLat)/2;
+
+    // Buat bounding sphere dari rectangle
+    const rect = Cesium.Rectangle.fromDegrees(minLon, minLat, maxLon, maxLat);
+    viewer.camera.flyTo({
+      destination: rect,
+      duration: 1.6
+    });
+    setStatus(`AIS aktif. Posisi area kapal sekitar: lat ${centerLat.toFixed(3)}, lon ${centerLon.toFixed(3)}.`);
+  }
+
   async function fetchAISOnce(){
     const url = $('mtUrl')?.value?.trim?.() || '';
     ensureAisLayer();
@@ -362,58 +391,90 @@
     if (!url){
       // Dummy bergerak (update koordinat sedikit tiap tick)
       DEMO_SHIPS = DEMO_SHIPS.map(v=>{
-        const dLon = (Math.cos(Date.now()/30000 + v.speed)*0.02) / 60; // ~0.0003 deg
+        const dLon = (Math.cos(Date.now()/30000 + v.speed)*0.02) / 60;
         const dLat = (Math.sin(Date.now()/30000 + v.speed)*0.02) / 60;
         return {...v, lon: v.lon + dLon, lat: v.lat + dLat};
       });
+
+      // Plot
       for (const v of DEMO_SHIPS){
         aisBillboards.add({
           position: Cesium.Cartesian3.fromDegrees(v.lon, v.lat),
-          image: 'https://cdn.jsdelivr.net/gh/tabler/tabler-icons/icons/ship.svg',
-          scale: 0.8, disableDepthTestDistance: Number.POSITIVE_INFINITY
+          image: SHIP_IMG,
+          scale: 0.12,                 // ikon PNG cukup besar; skala kecil
+          verticalOrigin: Cesium.VerticalOrigin.CENTER,
+          horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY
         });
       }
-      setStatus('Demo AIS: kapal bergerak simulatif.');
+
+      // Fly sekali saat mulai
+      if (!aisHasFlown){
+        aisHasFlown = true;
+        flyToAISExtent(DEMO_SHIPS);
+      } else {
+        setStatus('Demo AIS: kapal bergerak simulatif.');
+      }
       return;
     }
 
+    // Jika ada endpoint—ambil data asli
     try{
       const res = await fetch(url);
       if (!res.ok) throw new Error('AIS fetch gagal: ' + res.status);
       const data = await res.json();
       const arr = Array.isArray(data) ? data : (data?.data || []);
+
+      const shipsPlotted = [];
       for (const v of arr){
         const lon = +v.lon || +v.LONGITUDE || +v.longitude;
         const lat = +v.lat || +v.LATITUDE || +v.latitude;
         if (isFinite(lon) && isFinite(lat)){
+          shipsPlotted.push({lon,lat});
           aisBillboards.add({
             position: Cesium.Cartesian3.fromDegrees(lon, lat),
-            image: 'https://cdn.jsdelivr.net/gh/tabler/tabler-icons/icons/ship.svg',
-            scale: 0.8, disableDepthTestDistance: Number.POSITIVE_INFINITY
+            image: SHIP_IMG,
+            scale: 0.12,
+            verticalOrigin: Cesium.VerticalOrigin.CENTER,
+            horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY
           });
         }
       }
-      setStatus(`AIS: ${arr.length} kapal ditampilkan.`);
+      if (!aisHasFlown && shipsPlotted.length){
+        aisHasFlown = true;
+        flyToAISExtent(shipsPlotted);
+      } else {
+        setStatus(`AIS: ${shipsPlotted.length} kapal ditampilkan.`);
+      }
     }catch(e){
       console.error(e);
       setStatus('Gagal mengambil AIS endpoint. Menampilkan dummy bergerak.');
+      // fallback dummy
       for (const v of DEMO_SHIPS){
         aisBillboards.add({
           position: Cesium.Cartesian3.fromDegrees(v.lon, v.lat),
-          image: 'https://cdn.jsdelivr.net/gh/tabler/tabler-icons/icons/ship.svg',
-          scale: 0.8
+          image: SHIP_IMG,
+          scale: 0.12
         });
+      }
+      if (!aisHasFlown){
+        aisHasFlown = true;
+        flyToAISExtent(DEMO_SHIPS);
       }
     }
   }
+
   function startAIS(){
+    aisHasFlown = false;  // reset agar fly saat start
     fetchAISOnce();
-    const every = 2000; // update tiap 2 detik untuk efek bergerak
+    const everyMs = 2000; // update tiap 2 detik (efek bergerak)
     stopAIS();
-    aisTimer = setInterval(fetchAISOnce, every);
+    aisTimer = setInterval(fetchAISOnce, everyMs);
     $('togAIS').checked = true;
-    setStatus('AIS (dummy) berjalan.');
+    setStatus('AIS (dummy) berjalan dan akan auto-fly ke area kapal.');
   }
+
   function stopAIS(){
     if (aisTimer){ clearInterval(aisTimer); aisTimer=null; }
     if (aisBillboards){ aisBillboards.removeAll(); }
@@ -440,11 +501,8 @@
       if (url){
         mspDS = await Cesium.GeoJsonDataSource.load(url,{ clampToGround:true });
       } else {
-        mspDS = await Cesium.GeoJsonDataSource.load(DUMMY_ZONASI,{
-          clampToGround:true
-        });
+        mspDS = await Cesium.GeoJsonDataSource.load(DUMMY_ZONASI,{ clampToGround:true });
       }
-      // styling sederhana berdasar properti
       const colorByProp = (p)=> {
         const c = p.warna || (p.jenis==='Konservasi' ? '#00d1b2' : p.jenis==='Budidaya' ? '#ffd166' : '#118ab2');
         return Cesium.Color.fromCssColorString(c);
@@ -494,3 +552,4 @@
 </script>
 </body>
 </html>
+6
