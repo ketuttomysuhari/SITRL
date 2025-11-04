@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Marine Spatial Planning — CesiumJS</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<style>
+  html,body,#app {height:100%;margin:0}
+  #toolbar {
+    position:absolute; top:10px; left:10px; z-index:10;
+    background:#0b0f14cc; color:#e7eef8; padding:12px; border-radius:12px; width:360px;
+    font:14px/1.4 system-ui,Segoe UI,Roboto,Arial,sans-serif; backdrop-filter: blur(6px);
+    border:1px solid #1b2430;
+  }
+  #toolbar h2 {font-size:16px;margin:0 0 8px}
+  #toolbar details {margin:10px 0; border:1px solid #1f2733; border-radius:10px; padding:8px}
+  #toolbar summary {cursor:pointer; color:#a6d3ff; font-weight:600}
+  #toolbar label {display:block; margin:6px 0 2px}
+  #toolbar input, #toolbar textarea, #toolbar select {
+    width:100%; padding:6px 8px; border-radius:8px; border:1px solid #2a3342; background:#0f141b; color:#e7eef8;
+  }
+  #toolbar button {margin-top:8px; width:100%; padding:8px; border-radius:10px; border:0; cursor:pointer; background:#2e8fff; color:white; font-weight:700}
+  #toolbar .row {display:flex; gap:8px}
+  #toolbar .row > * {flex:1}
+  #status {
+    position:absolute; bottom:10px; left:10px; z-index:10; color:#e7eef8; background:#0b0f14cc;
+    border:1px solid #1b2430; padding:8px 12px; border-radius:12px; max-width:460px; font:12px system-ui,Segoe UI,Roboto,Arial,sans-serif
+  }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/cesium@1.120/Build/Cesium/Cesium.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.120/Build/Cesium/Widgets/widgets.css"/>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="toolbar">
+  <h2>🌊 Marine Spatial Planning</h2>
+
+  <details open>
+    <summary>Tokens & Kunci</summary>
+    <label>Cesium ion token</label>
+    <input id="ionToken" placeholder="PASTE_CESIUM_ION_TOKEN" value="PASTE_CESIUM_ION_TOKEN"/>
+    <div class="row">
+      <div>
+        <label>MarineTraffic API key</label>
+        <input id="mtKey" placeholder="MT_xxxxxxxxxxxxxxxxx"/>
+      </div>
+      <div>
+        <label>GFW API token (opsional)</label>
+        <input id="gfwKey" placeholder="Bearer xxxxx (jika perlu)"/>
+      </div>
+    </div>
+    <button id="applyTokens">Terapkan Token</button>
+  </details>
+
+  <details open>
+    <summary>Gedung 3D & Zona</summary>
+    <button id="toggleOSMB">Toggle OSM Buildings</button>
+    <label>Impor Zona Tata Ruang (GeoJSON URL)</label>
+    <input id="mspUrl" placeholder="https://server/zonasi_msp.geojson"/>
+    <button id="loadMSP">Muat Zonasi</button>
+  </details>
+
+  <details>
+    <summary>Copernicus Marine (OGC WMS/WMTS)</summary>
+    <label>WMS/WMTS URL</label>
+    <input id="wmsUrl" placeholder="https://.../wms"/>
+    <label>Layer name</label>
+    <input id="wmsLayer" placeholder="nama_layer_di_capabilities"/>
+    <div class="row">
+      <div><label>Format</label>
+        <select id="wmsFormat">
+          <option value="image/png">image/png (transparan)</option>
+          <option value="image/jpeg">image/jpeg</option>
+        </select>
+      </div>
+      <div><label>Opacity</label><input id="wmsOpacity" type="number" step="0.1" min="0" max="1" value="0.8"/></div>
+    </div>
+    <button id="addWMS">Tambah Layer WMS/WMTS</button>
+  </details>
+
+  <details>
+    <summary>MarineTraffic (AIS)</summary>
+    <label>MMSI (opsional, 1 kapal)</label>
+    <input id="mtMmsi" placeholder="misal 525123456"/>
+    <label>BBOX (minLon,minLat,maxLon,maxLat)</label>
+    <input id="mtBbox" placeholder="110, -10, 130, 5"/>
+    <div class="row">
+      <div><label>Interval (detik)</label><input id="mtInterval" type="number" min="10" value="60"/></div>
+      <div><label>Durasi (menit)</label><input id="mtMinutes" type="number" min="1" value="10"/></div>
+    </div>
+    <button id="startAIS">Mulai Tracking AIS</button>
+    <button id="stopAIS" style="background:#334155">Stop AIS</button>
+  </details>
+
+  <details>
+    <summary>Global Fishing Watch (eksperimen)</summary>
+    <label>Template XYZ/Raster tile (opsional)</label>
+    <input id="gfwTiles" placeholder="https://tiles.server/{z}/{x}/{y}.png?token=..."/>
+    <button id="addGFW">Tambah Layer GFW (tile)</button>
+    <label>GeoJSON URL (agregasi/ekspor)</label>
+    <input id="gfwGeojson" placeholder="https://api.gfw/.../layer.geojson?token=..."/>
+    <button id="addGFWGeoJSON">Tambah GFW GeoJSON</button>
+  </details>
+</div>
+
+<div id="status">Status: siap</div>
+
+<script>
+  // ====== STATE & UTILS ======
+  const S = {
+    viewer: null,
+    layers: { wms: [], gfwTiles: null, osmB: null, msp: null, ais: null },
+    timers: { ais: null },
+    lastStatus: ''
+  };
+  const $ = (id) => document.getElementById(id);
+  const log = (msg) => { S.lastStatus = msg; $('status').textContent = 'Status: ' + msg; console.log('[INFO]', msg); };
+  const err = (e) => { $('status').textContent = 'Error: ' + (e?.message||e); console.error(e); };
+
+  // ====== INIT CESIUM ======
+  function initCesium() {
+    const ionToken = $('ionToken').value.trim();
+    if (ionToken && ionToken !== 'PASTE_CESIUM_ION_TOKEN') Cesium.Ion.defaultAccessToken = ionToken;
+    S.viewer = new Cesium.Viewer('app', {
+      animation:false, timeline:false, geocoder:true, sceneModePicker:true, baseLayerPicker:true,
+      terrain: Cesium.Terrain.fromWorldTerrain(), // Terrain global
+      infoBox:true, selectionIndicator:true
+    });
+    // OSM Buildings (toggle-able)
+    S.layers.osmB = Cesium.createOsmBuildings(); // requires ion token
+    log('Cesium siap. Gunakan panel untuk menambah layer.');
+  }
+
+  // ====== TOGGLES ======
+  function toggleOSMBuildings() {
+    const p = S.viewer.scene.primitives;
+    if (S.layers.osmB.added) { p.remove(S.layers.osmB); S.layers.osmB.added = false; log('OSM Buildings: OFF'); }
+    else { p.add(S.layers.osmB); S.layers.osmB.added = true; log('OSM Buildings: ON'); }
+  }
+
+  // ====== MSP (Marine Spatial Planning) ZONES: GeoJSON ======
+  async function loadMSPZones() {
+    try {
+      const url = $('mspUrl').value.trim();
+      if (!url) { alert('Isi URL GeoJSON zonasi.'); return; }
+      if (S.layers.msp) { S.viewer.dataSources.remove(S.layers.msp); }
+      const ds = await Cesium.GeoJsonDataSource.load(url, {
+        clampToGround:true,
+        stroke: Cesium.Color.CYAN.withAlpha(0.9),
+        fill: Cesium.Color.CYAN.withAlpha(0.15),
+        strokeWidth: 2
+      });
+      S.layers.msp = ds; S.viewer.dataSources.add(ds);
+      S.viewer.flyTo(ds);
+      log('Zonasi MSP dimuat.');
+    } catch (e) { err(e); }
+  }
+
+  // ====== Copernicus Marine via WMS/WMTS ======
+  function addWMSLayer() {
+    const url = $('wmsUrl').value.trim(), layer = $('wmsLayer').value.trim();
+    const fmt = $('wmsFormat').value, opacity = parseFloat($('wmsOpacity').value||'1');
+    if (!url || !layer) return alert('Isi URL WMS/WMTS & layer name dari GetCapabilities.');
+    try {
+      let provider;
+      // Heuristik sederhana: WMTS jika mengandung /wmts atau 'WMTS' di URL
+      if (/wmts/i.test(url)) {
+        provider = new Cesium.WebMapTileServiceImageryProvider({
+          url, layer, style:'default', tileMatrixSetID:'EPSG:3857', format: fmt,
+          maximumLevel: 14, tilingScheme: new Cesium.WebMercatorTilingScheme()
+        });
+      } else {
+        provider = new Cesium.WebMapServiceImageryProvider({
+          url,
+          layers: layer,
+          parameters: { format: fmt, transparent: true, tiled: true },
+        });
+      }
+      const lyr = S.viewer.imageryLayers.addImageryProvider(provider);
+      lyr.alpha = opacity;
+      S.layers.wms.push(lyr);
+      log('Layer Copernicus (OGC) ditambahkan.');
+    } catch (e) { err(e); }
+  }
+
+  // ====== MarineTraffic (AIS) ======
+  // NOTE: Endpoint & params mengikuti dokumentasi; masukkan API key/produk yang kamu langganan.
+  //       Di sini contoh pola fetch area-by-BBOX lalu plot Billboard.
+  async function fetchAISOnce() {
+    const key = $('mtKey').value.trim();
+    if (!key) { log('Masukkan MarineTraffic API key.'); return; }
+    const mmsi = $('mtMmsi').value.trim();
+    const bboxTxt = $('mtBbox').value.trim() || '110,-10,130,5';
+    const [minLon,minLat,maxLon,maxLat] = bboxTxt.split(',').map(Number);
+    try {
+      // ===== Ganti URL sesuai produk yang kamu punya (historical/real-time) =====
+      // Contoh pola (pseudourl): https://svc.marinetraffic.com/api/exportvessel/v:5/{APIKEY}?mmsi=...  (lihat docs)
+      // Di sini kita gunakan placeholder yang akan gagal tanpa URL resmi dari paket langgananmu.
+      const params = new URLSearchParams();
+      if (mmsi) params.set('mmsi', mmsi);
+      params.set('minlat', minLat); params.set('minlon', minLon);
+      params.set('maxlat', maxLat); params.set('maxlon', maxLon);
+      params.set('protocol', 'jsono'); // misal format jsono jika didukung paket
+      // !!! GANTI 'YOUR_MT_ENDPOINT' dengan endpoint dari paket API yang aktif sesuai dokumen !!!
+      const url = `https://YOUR_MT_ENDPOINT?${params.toString()}&api_key=${encodeURIComponent(key)}`;
+
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('AIS fetch gagal: ' + res.status);
+      const data = await res.json();
+
+      // Normalisasi: data → array {lat,lon,speed,course,mmsi}
+      const vessels = Array.isArray(data) ? data : (data?.data || []);
+      if (!S.layers.ais) {
+        S.layers.ais = S.viewer.scene.primitives.add(new Cesium.BillboardCollection());
+      } else {
+        S.layers.ais.removeAll();
+      }
+      const bb = S.layers.ais;
+      vessels.forEach(v => {
+        const lon = +v.lon || +v.LONGITUDE || +v.longitude;
+        const lat = +v.lat || +v.LATITUDE || +v.latitude;
+        if (isFinite(lon) && isFinite(lat)) {
+          bb.add({
+            position: Cesium.Cartesian3.fromDegrees(lon, lat),
+            image: 'https://cdn.jsdelivr.net/gh/google/material-design-icons/symbols/web/ship.svg',
+            scale: 0.7
+          });
+        }
+      });
+      log(`AIS: ${vessels.length} kapal ditampilkan.`);
+    } catch (e) { err(e); }
+  }
+  function startAIS() {
+    if (S.timers.ais) clearInterval(S.timers.ais);
+    fetchAISOnce(); // segera tarik pertama kali
+    const interval = Math.max(10, (+$('mtInterval').value||60));
+    S.timers.ais = setInterval(fetchAISOnce, interval * 1000);
+    log('AIS tracking dimulai.');
+  }
+  function stopAIS() {
+    if (S.timers.ais) { clearInterval(S.timers.ais); S.timers.ais = null; log('AIS tracking dihentikan.'); }
+  }
+
+  // ====== Global Fishing Watch (tiles atau GeoJSON agregasi) ======
+  function addGFWTiles() {
+    const tpl = $('gfwTiles').value.trim();
+    if (!tpl) return alert('Isi template URL tile (XYZ/WMTS) dari GFW.');
+    try {
+      // XYZ raster tiles (pakai UrlTemplateImageryProvider)
+      const prov = new Cesium.UrlTemplateImageryProvider({ url: tpl, minimumLevel: 0, maximumLevel: 12 });
+      const layer = S.viewer.imageryLayers.addImageryProvider(prov);
+      layer.alpha = 0.7;
+      S.layers.gfwTiles = layer;
+      log('Layer GFW tile ditambahkan.');
+    } catch (e) { err(e); }
+  }
+  async function addGFWGeoJSON() {
+    const url = $('gfwGeojson').value.trim();
+    if (!url) return alert('Isi URL GeoJSON GFW (dengan token bila perlu).');
+    try {
+      const ds = await Cesium.GeoJsonDataSource.load(url, {
+        clampToGround:false,
+        stroke: Cesium.Color.ORANGE.withAlpha(0.9),
+        fill: Cesium.Color.ORANGE.withAlpha(0.15),
+        strokeWidth: 2
+      });
+      S.viewer.dataSources.add(ds);
+      S.viewer.flyTo(ds);
+      log('GeoJSON GFW ditambahkan.');
+    } catch (e) { err(e); }
+  }
+
+  // ====== Events & boot ======
+  $('applyTokens').onclick = () => {
+    const t = $('ionToken').value.trim();
+    if (t && S.viewer) Cesium.Ion.defaultAccessToken = t;
+    alert('Token diterapkan (reload bila perlu).');
+  };
+  $('toggleOSMB').onclick = toggleOSMBuildings;
+  $('loadMSP').onclick = loadMSPZones;
+  $('addWMS').onclick = addWMSLayer;
+  $('startAIS').onclick = startAIS;
+  $('stopAIS').onclick = stopAIS;
+  $('addGFW').onclick = addGFWTiles;
+  $('addGFWGeoJSON').onclick = addGFWGeoJSON;
+
+  initCesium();
+</script>
+</body>
+</html>
