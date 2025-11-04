@@ -10,10 +10,9 @@
 <style>
   :root{
     --bg:#0b1220; --panel:#0f1a2b; --border:#1f2d44; --text:#e6eef9; --muted:#97a6bf;
-    --brand:#0c5adb; --brand-2:#0e7fff; --accent:#1e90ff; --ok:#2cc36b; --warn:#f0b429;
+    --brand:#0c5adb; --brand-2:#0e7fff; --accent:#1e90ff;
   }
   html,body,#map{height:100%;margin:0;background:var(--bg);font:14px/1.4 "Inter",system-ui,Segoe UI,Roboto,Arial,sans-serif}
-  /* Header bar */
   #govbar{
     position:absolute; top:0; left:0; right:0; height:56px; z-index:12;
     display:flex; align-items:center; gap:10px; padding:0 16px;
@@ -23,48 +22,37 @@
   #govbar img{height:30px}
   #govbar h1{font-size:16px; margin:0; font-weight:800; letter-spacing:.2px}
   #govbar small{opacity:.9; display:block; font-weight:500}
-
-  /* Sidebar */
   #ui{
-    position:absolute; top:68px; left:16px; z-index:10; width:380px; max-height:calc(100% - 84px);
+    position:absolute; top:68px; left:16px; z-index:10; width:395px; max-height:calc(100% - 84px);
     background:#0b1220cc; border:1px solid var(--border); border-radius:14px; backdrop-filter: blur(6px);
     color:var(--text); overflow:auto; box-shadow:0 8px 28px rgba(0,0,0,.35);
   }
-  .section{padding:12px 14px; border-bottom:1px solid var(--border)}
-  .section h2{font-size:14px; margin:0 0 6px; color:#cfe3ff; letter-spacing:.2px}
-  .sub{color:var(--muted); font-size:12px; margin-bottom:6px}
-
-  /* Tab */
   .tabs{display:flex; gap:6px; padding:10px 12px; border-bottom:1px solid var(--border)}
   .tab{flex:1; text-align:center; padding:8px 10px; border-radius:10px; cursor:pointer;
     background:#0e1830; color:#cfe3ff; border:1px solid #182746; font-weight:700}
   .tab.active{background:#14325c; border-color:#224e88}
-
-  /* Controls */
+  .section{padding:12px 14px; border-bottom:1px solid var(--border)}
+  .section h2{font-size:14px; margin:0 0 6px; color:#cfe3ff; letter-spacing:.2px}
+  .sub{color:var(--muted); font-size:12px; margin-bottom:6px}
   .tog{display:flex; align-items:center; gap:10px; margin:8px 0}
   .tog input[type=checkbox]{transform:scale(1.15)}
   label{display:block; margin:6px 0 2px}
-  input,select,button{
-    width:100%; padding:8px 10px; border-radius:10px; border:1px solid #20324d; background:#0f1a2b; color:var(--text);
-  }
-  button{cursor:pointer; background:#1e90ff; border:0; font-weight:800}
+  input,select,button{width:100%; padding:8px 10px; border-radius:10px; border:1px solid #20324d; background:#0f1a2b; color:var(--text);}
+  button{cursor:pointer; background:var(--accent); border:0; font-weight:800}
   .btn-ghost{background:#112038; border:1px solid #20324d}
-  .row{display:flex; gap:8px}
-  .row>*{flex:1}
+  .row{display:flex; gap:8px} .row>*{flex:1}
   .note{font-size:12px; color:var(--muted)}
-  .help{font-size:12px; color:#cfe3ff}
-
+  a.link{color:#9ad1ff; text-decoration:none}
   #status{
     position:absolute; right:16px; bottom:16px; z-index:5; color:var(--text); background:#0b1220cc;
     border:1px solid var(--border); border-radius:12px; padding:8px 12px; max-width:520px; font-size:12px;
   }
-  a.link{color:#9ad1ff; text-decoration:none}
 </style>
 </head>
 <body>
 <div id="map"></div>
 
-<!-- Pemerintah header -->
+<!-- Header -->
 <div id="govbar">
   <img src="https://cdn.jsdelivr.net/gh/tabler/tabler-icons/icons/shield.svg" alt="Lambang" aria-hidden="true">
   <div>
@@ -73,7 +61,7 @@
   </div>
 </div>
 
-<!-- Sidebar ala portal pemerintah -->
+<!-- Sidebar -->
 <div id="ui" role="region" aria-label="Panel Pengaturan">
   <div class="tabs" role="tablist">
     <div class="tab active" role="tab" aria-selected="true" id="tabLayers">Layer</div>
@@ -81,36 +69,48 @@
     <div class="tab" role="tab" aria-selected="false" id="tabTentang">Tentang</div>
   </div>
 
-  <!-- TAB: LAYER -->
+  <!-- LAYER -->
   <div id="paneLayers" class="section" role="tabpanel" aria-labelledby="tabLayers">
     <h2>Lapisan Peta</h2>
     <div class="sub">Pilih informasi yang ingin ditampilkan</div>
 
+    <div class="row">
+      <div>
+        <label>Fly to lokasi pelabuhan</label>
+        <select id="flyTo">
+          <option value="priok">Jakarta – Tanjung Priok</option>
+          <option value="perak">Surabaya – Tanjung Perak</option>
+          <option value="makassar">Makassar – Soekarno Hatta</option>
+        </select>
+      </div>
+      <div style="align-self:end"><button id="flyBtn">Fly</button></div>
+    </div>
+
     <div class="tog">
-      <input type="checkbox" id="togOSMB" />
+      <input type="checkbox" id="togOSMB" checked />
       <label for="togOSMB">Gedung 3D (OSM Buildings)</label>
     </div>
 
     <div class="tog">
       <input type="checkbox" id="togGFW" />
-      <label for="togGFW">Aktivitas Penangkapan Ikan (Global Fishing Watch)</label>
+      <label for="togGFW">Aktivitas Penangkapan Ikan (GFW)</label>
     </div>
 
     <div class="tog">
       <input type="checkbox" id="togAIS" />
-      <label for="togAIS">Posisi Kapal (MarineTraffic — demo)</label>
+      <label for="togAIS">Posisi Kapal (AIS — demo bergerak)</label>
     </div>
 
     <div class="tog">
       <input type="checkbox" id="togMSP" />
-      <label for="togMSP">Zonasi Tata Ruang Laut (GeoJSON)</label>
+      <label for="togMSP">Zonasi Tata Ruang Laut</label>
     </div>
   </div>
 
-  <!-- TAB: DATA -->
+  <!-- DATA -->
   <div id="paneData" class="section" role="tabpanel" aria-labelledby="tabData" hidden>
     <h2>Sumber Data & Preset</h2>
-    <div class="sub">Sesuaikan layer berdasarkan kebutuhan</div>
+    <div class="sub">Gunakan preset / URL sendiri. Jika kosong, sistem pakai <b>dummy</b>.</div>
 
     <div style="margin-top:8px">
       <h3 style="font-size:13px;margin:0 0 6px;color:#bcd6ff">Global Fishing Watch</h3>
@@ -124,7 +124,6 @@
         <button id="gfwApply">Terapkan</button>
         <button id="gfwOff" class="btn-ghost">Matikan</button>
       </div>
-      <p class="note">Beberapa layer GFW memerlukan token. Gunakan preset publik bila belum ada kredensial.</p>
     </div>
 
     <div style="height:10px"></div>
@@ -162,67 +161,39 @@
         <button id="wmsAdd">Tambah / Ganti</button>
         <button id="wmsClear" class="btn-ghost">Hapus Semua</button>
       </div>
-      <p class="note">Ambil <em>GetCapabilities</em> dari portal Copernicus untuk daftar layer.</p>
-    </div>
-
-    <div style="height:10px"></div>
-
-    <div>
-      <h3 style="font-size:13px;margin:0 0 6px;color:#bcd6ff">MarineTraffic (AIS)</h3>
-      <label>API endpoint (opsional bila berlangganan)</label>
-      <input id="mtUrl" placeholder="https://services.marinetraffic.com/api/.../YOUR_KEY?params=..."/>
-      <div class="row">
-        <div>
-          <label>Interval (detik)</label>
-          <input id="mtEvery" type="number" min="5" value="60"/>
-        </div>
-        <div>
-          <label>Durasi (menit)</label>
-          <input id="mtMinutes" type="number" min="1" value="10"/>
-        </div>
-      </div>
-      <div class="row">
-        <button id="mtStart">Mulai Tracking</button>
-        <button id="mtStop" class="btn-ghost">Stop</button>
-      </div>
-      <p class="note">Tanpa endpoint, akan tampil kapal <em>demo</em> sebagai placeholder.</p>
+      <p class="note">Jika kosong, lewati saja (tanpa dummy untuk WMS).</p>
     </div>
 
     <div style="height:10px"></div>
 
     <div>
       <h3 style="font-size:13px;margin:0 0 6px;color:#bcd6ff">Zonasi (GeoJSON)</h3>
-      <label>GeoJSON URL</label>
+      <label>GeoJSON URL (opsional)</label>
       <input id="mspUrl" placeholder="https://server/zonasi_msp.geojson"/>
       <div class="row">
         <button id="mspLoad">Muat Zonasi</button>
         <button id="mspClear" class="btn-ghost">Hapus</button>
       </div>
-      <p class="note">Format properti: nama zona, jenis, peruntukan (opsional untuk popup).</p>
+      <p class="note">Jika kosong, sistem memuat <b>dummy zonasi</b> (konservasi, budidaya, alur).</p>
     </div>
   </div>
 
-  <!-- TAB: TENTANG -->
+  <!-- TENTANG -->
   <div id="paneTentang" class="section" role="tabpanel" aria-labelledby="tabTentang" hidden>
     <h2>Tentang</h2>
-    <p class="help"><b>SITARLAUT 3D</b> adalah platform 3D untuk perencanaan & pengelolaan tata ruang laut, dengan dukungan data aktivitas perikanan (GFW), oseanografi (Copernicus), dan pergerakan kapal (MarineTraffic).</p>
-    <ul class="help">
-      <li>Mendukung analisis berbasis waktu (konsep <b>Digital Twin</b>).</li>
-      <li>Antarmuka disederhanakan untuk penggunaan pemerintahan.</li>
-      <li>Kompatibel dengan data zonasi GeoJSON instansi.</li>
-    </ul>
-    <p class="note">SDGs: 14 (Life Below Water), 11 (Sustainable Cities and Communities).</p>
+    <p class="note"><b>SITARLAUT 3D</b> — platform 3D untuk perencanaan & pengelolaan tata ruang laut. Mendukung konsep <b>Digital Twin</b> (layer berbasis waktu) dan integrasi data GFW, Copernicus, serta AIS.</p>
+    <p class="note">Gunakan tab <b>Layer</b> untuk menyalakan/mematikan; tab <b>Data</b> untuk preset/URL.</p>
   </div>
 </div>
 
-<div id="status" role="status" aria-live="polite">Status: siap</div>
+<div id="status" role="status" aria-live="polite">Status: memuat…</div>
 
 <script>
 (function(){
   const $ = (id)=>document.getElementById(id);
   const setStatus = (t)=>{ $('status').textContent = 'Status: ' + t; console.log('[SITARLAUT]', t); };
 
-  // —— Tabs behavior
+  // Tabs
   const tabs = [
     {tab:'tabLayers', pane:'paneLayers'},
     {tab:'tabData', pane:'paneData'},
@@ -237,8 +208,7 @@
     };
   });
 
-  // —— Init Cesium (TOKEN DISISIPKAN DI KODE, TIDAK DI UI)
-  // ⚠️ Untuk produksi, sebaiknya inject dari server-side/env saat build.
+  // ===== Cesium init (token disisipkan di kode)
   Cesium.Ion.defaultAccessToken =
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4MGZjYmVlNC01MDEwLTQ3M2ItYTU0Mi00NTljZDMwYTdhYTMiLCJpZCI6NzU1MiwiaWF0IjoxNzYyMjY3NjI0fQ._x11gbiK3ozL9DYz1WVGQDruICGCuTuhZXAglQQh7ZQ';
 
@@ -249,20 +219,31 @@
       terrain: Cesium.Terrain.fromWorldTerrain(),
       infoBox:true, selectionIndicator:true
     });
+    viewer.scene.globe.enableLighting = true;
 
-    // Fokus awal: Indonesia
-    viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(117, -2, 3_500_000),
-      duration: 1.5
+    // Fokus awal Indonesia
+    viewer.camera.setView({
+      destination: Cesium.Cartesian3.fromDegrees(117, -2, 5_000_000)
     });
 
-    // Wire LAYER toggles
+    // Auto-add OSM Buildings
+    try{
+      osmBuildings = Cesium.createOsmBuildings();
+      viewer.scene.primitives.add(osmBuildings);
+      $('togOSMB').checked = true;
+      setStatus('OSM Buildings aktif. Gunakan tombol Fly untuk melihat jelas.');
+    }catch(e){
+      console.error(e);
+      setStatus('Gagal memuat OSM Buildings. Cek token/jaringan.');
+    }
+
+    // Toggle layer
     $('togOSMB').addEventListener('change', onToggleOSMB);
     $('togGFW').addEventListener('change', onToggleGFW);
     $('togAIS').addEventListener('change', onToggleAIS);
     $('togMSP').addEventListener('change', onToggleMSP);
 
-    // Wire DATA actions
+    // Data actions
     $('gfwApply').onclick = enableOrSwapGFW;
     $('gfwOff').onclick = ()=>{ if(gfwLayer){ viewer.imageryLayers.remove(gfwLayer); gfwLayer=null; } $('togGFW').checked=false; setStatus('GFW dimatikan.'); };
 
@@ -279,16 +260,25 @@
     $('wmsAdd').onclick = addWMS;
     $('wmsClear').onclick = clearWMS;
 
-    $('mtStart').onclick = startAIS;
-    $('mtStop').onclick = stopAIS;
-
     $('mspLoad').onclick = loadMSP;
     $('mspClear').onclick = clearMSP;
 
-    setStatus('Siap: pilih layer di tab "Layer" atau atur preset di tab "Data".');
+    $('flyBtn').onclick = ()=> {
+      const where = $('flyTo').value;
+      const targets = {
+        priok:    {lon:106.884, lat:-6.109, h:2200},   // Tj. Priok
+        perak:    {lon:112.737, lat:-7.200, h:2200},   // Tj. Perak
+        makassar: {lon:119.418, lat:-5.125, h:2200}    // Makassar
+      };
+      const t = targets[where]||targets.priok;
+      viewer.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(t.lon, t.lat, t.h), duration: 1.6 });
+      setStatus('Pindah kamera ke area pelabuhan. Zoom dekati untuk melihat gedung.');
+    };
+
+    setStatus('Siap. Gunakan Layer/Data di panel kiri.');
   }
 
-  // —— OSM Buildings
+  // ===== OSM Buildings
   function onToggleOSMB(e){
     if (e.target.checked){
       if (!osmBuildings){ osmBuildings = Cesium.createOsmBuildings(); }
@@ -300,7 +290,7 @@
     }
   }
 
-  // —— GFW
+  // ===== GFW
   function enableOrSwapGFW(){
     const url = $('gfwTileUrl').value.trim() || $('gfwPreset').value;
     if (!url){ alert('Isi URL tile XYZ GFW atau pilih preset.'); return; }
@@ -313,21 +303,20 @@
   }
   function onToggleGFW(e){
     if (e.target.checked){
-      if (!gfwLayer) enableOrSwapGFW(); else setStatus('GFW: heatmap aktif.');
+      if (!gfwLayer) enableOrSwapGFW(); else setStatus('GFW aktif.');
     }else{
       if (gfwLayer){ viewer.imageryLayers.remove(gfwLayer); gfwLayer=null; }
       setStatus('GFW dimatikan.');
     }
   }
 
-  // —— Copernicus Marine (WMS/WMTS)
+  // ===== Copernicus Marine (WMS/WMTS)
   function addWMS(){
     const url = $('wmsUrl').value.trim();
     const layer = $('wmsLayer').value.trim();
     const fmt = $('wmsFmt').value;
     const alpha = Math.min(1, Math.max(0, parseFloat($('wmsAlpha').value||'0.8')));
     if (!url || !layer){ alert('Isi URL WMS/WMTS dan layer name.'); return; }
-
     try{
       let prov;
       if (/wmts/i.test(url)){
@@ -355,31 +344,39 @@
     setStatus('Semua layer WMS/WMTS dihapus.');
   }
 
-  // —— MarineTraffic (AIS)
-  const DEMO_SHIPS = [
-    { name:'KM Nusantara', lon:117.1, lat:-0.8, course:45, speed:12 },
-    { name:'MV Samudra',   lon:115.9, lat:-1.5, course:90, speed:10 },
-    { name:'MT LautBirU',  lon:119.2, lat:-2.1, course:12, speed:14 }
+  // ===== AIS (dummy bergerak atau dari endpoint jika ada)
+  let DEMO_SHIPS = [
+    { name:'KM Nusantara', lon:117.10, lat:-0.80, course:45, speed:12 },
+    { name:'MV Samudra',   lon:115.90, lat:-1.50, course:90, speed:10 },
+    { name:'MT LautBiru',  lon:119.20, lat:-2.10, course:12, speed:14 }
   ];
   function onToggleAIS(e){ if (e.target.checked) startAIS(); else stopAIS(); }
   function ensureAisLayer(){
     if (!aisBillboards){ aisBillboards = viewer.scene.primitives.add(new Cesium.BillboardCollection()); }
   }
   async function fetchAISOnce(){
-    const url = $('mtUrl').value.trim();
-    ensureAisLayer(); aisBillboards.removeAll();
+    const url = $('mtUrl')?.value?.trim?.() || '';
+    ensureAisLayer();
+    aisBillboards.removeAll();
+
     if (!url){
-      // Demo statis
+      // Dummy bergerak (update koordinat sedikit tiap tick)
+      DEMO_SHIPS = DEMO_SHIPS.map(v=>{
+        const dLon = (Math.cos(Date.now()/30000 + v.speed)*0.02) / 60; // ~0.0003 deg
+        const dLat = (Math.sin(Date.now()/30000 + v.speed)*0.02) / 60;
+        return {...v, lon: v.lon + dLon, lat: v.lat + dLat};
+      });
       for (const v of DEMO_SHIPS){
         aisBillboards.add({
           position: Cesium.Cartesian3.fromDegrees(v.lon, v.lat),
           image: 'https://cdn.jsdelivr.net/gh/tabler/tabler-icons/icons/ship.svg',
-          scale: 0.75, disableDepthTestDistance: Number.POSITIVE_INFINITY
+          scale: 0.8, disableDepthTestDistance: Number.POSITIVE_INFINITY
         });
       }
-      setStatus('Demo AIS: kapal contoh ditampilkan.');
+      setStatus('Demo AIS: kapal bergerak simulatif.');
       return;
     }
+
     try{
       const res = await fetch(url);
       if (!res.ok) throw new Error('AIS fetch gagal: ' + res.status);
@@ -392,54 +389,93 @@
           aisBillboards.add({
             position: Cesium.Cartesian3.fromDegrees(lon, lat),
             image: 'https://cdn.jsdelivr.net/gh/tabler/tabler-icons/icons/ship.svg',
-            scale: 0.75, disableDepthTestDistance: Number.POSITIVE_INFINITY
+            scale: 0.8, disableDepthTestDistance: Number.POSITIVE_INFINITY
           });
         }
       }
       setStatus(`AIS: ${arr.length} kapal ditampilkan.`);
     }catch(e){
       console.error(e);
-      setStatus('Gagal mengambil AIS endpoint. Menampilkan demo.');
+      setStatus('Gagal mengambil AIS endpoint. Menampilkan dummy bergerak.');
       for (const v of DEMO_SHIPS){
-        aisBillboards.add({ position: Cesium.Cartesian3.fromDegrees(v.lon, v.lat),
-          image:'https://cdn.jsdelivr.net/gh/tabler/tabler-icons/icons/ship.svg', scale:.75 });
+        aisBillboards.add({
+          position: Cesium.Cartesian3.fromDegrees(v.lon, v.lat),
+          image: 'https://cdn.jsdelivr.net/gh/tabler/tabler-icons/icons/ship.svg',
+          scale: 0.8
+        });
       }
     }
   }
   function startAIS(){
     fetchAISOnce();
-    const every = Math.max(5, parseInt($('mtEvery').value||'60',10));
+    const every = 2000; // update tiap 2 detik untuk efek bergerak
     stopAIS();
-    aisTimer = setInterval(fetchAISOnce, every*1000);
+    aisTimer = setInterval(fetchAISOnce, every);
     $('togAIS').checked = true;
-    setStatus('AIS tracking berjalan.');
+    setStatus('AIS (dummy) berjalan.');
   }
   function stopAIS(){
     if (aisTimer){ clearInterval(aisTimer); aisTimer=null; }
     if (aisBillboards){ aisBillboards.removeAll(); }
     $('togAIS').checked = false;
-    setStatus('AIS tracking dihentikan.');
+    setStatus('AIS dimatikan.');
   }
 
-  // —— Zonasi MSP (GeoJSON)
+  // ===== MSP Zonasi (dummy kalau URL kosong)
+  const DUMMY_ZONASI = {
+    "type":"FeatureCollection",
+    "features":[
+      { "type":"Feature", "properties":{"nama":"Zona Konservasi","jenis":"Konservasi","warna":"#00d1b2"},
+        "geometry":{"type":"Polygon","coordinates":[[[110,-6],[110.8,-6],[110.8,-5.6],[110,-5.6],[110,-6]]] } },
+      { "type":"Feature", "properties":{"nama":"Zona Budidaya","jenis":"Budidaya","warna":"#ffd166"},
+        "geometry":{"type":"Polygon","coordinates":[[[112,-7.2],[112.7,-7.2],[112.7,-6.7],[112,-6.7],[112,-7.2]]] } },
+      { "type":"Feature", "properties":{"nama":"Alur Pelayaran","jenis":"Alur","warna":"#118ab2"},
+        "geometry":{"type":"LineString","coordinates":[[106.7,-6.1],[107.2,-6.05],[107.6,-5.95]]} }
+    ]
+  };
   async function loadMSP(){
     const url = $('mspUrl').value.trim();
-    if (!url){ alert('Isi URL GeoJSON zonasi.'); return; }
     try{
       if (mspDS){ viewer.dataSources.remove(mspDS); mspDS=null; }
-      mspDS = await Cesium.GeoJsonDataSource.load(url,{
-        clampToGround:true,
-        stroke: Cesium.Color.CYAN.withAlpha(0.9),
-        fill:   Cesium.Color.CYAN.withAlpha(0.18),
-        strokeWidth:2
+      if (url){
+        mspDS = await Cesium.GeoJsonDataSource.load(url,{ clampToGround:true });
+      } else {
+        mspDS = await Cesium.GeoJsonDataSource.load(DUMMY_ZONASI,{
+          clampToGround:true
+        });
+      }
+      // styling sederhana berdasar properti
+      const colorByProp = (p)=> {
+        const c = p.warna || (p.jenis==='Konservasi' ? '#00d1b2' : p.jenis==='Budidaya' ? '#ffd166' : '#118ab2');
+        return Cesium.Color.fromCssColorString(c);
+      };
+      mspDS.entities.values.forEach(ent=>{
+        const p = ent.properties?.getValue(new Cesium.JulianDate()) || {};
+        const col = colorByProp(p);
+        if (ent.polygon){
+          ent.polygon.material = col.withAlpha(0.18);
+          ent.polygon.outline = true;
+          ent.polygon.outlineColor = col.withAlpha(0.9);
+          ent.polygon.extrudedHeight = 0;
+        }
+        if (ent.polyline){
+          ent.polyline.material = col;
+          ent.polyline.width = 3;
+        }
+        ent.description = `
+          <b>${p.nama||'Zonasi'}</b><br/>
+          Jenis: ${p.jenis||'-'}<br/>
+          Koordinat: otomatis
+        `;
       });
+
       viewer.dataSources.add(mspDS);
       viewer.flyTo(mspDS);
       $('togMSP').checked = true;
-      setStatus('Zonasi MSP dimuat.');
+      setStatus(url ? 'Zonasi MSP dimuat dari URL.' : 'Zonasi MSP dummy dimuat.');
     }catch(e){
       console.error(e);
-      alert('Gagal memuat GeoJSON. Pastikan CORS/URL valid.');
+      alert('Gagal memuat zonasi. Pastikan URL/CORS.'); 
     }
   }
   function clearMSP(){
@@ -448,11 +484,11 @@
     setStatus('Zonasi MSP dihapus.');
   }
   function onToggleMSP(e){
-    if (e.target.checked){ if (!mspDS) loadMSP(); else setStatus('Zonasi MSP aktif.'); }
+    if (e.target.checked){ if (!mspDS) loadMSP(); else setStatus('Zonasi aktif.'); }
     else{ clearMSP(); }
   }
 
-  // —— Start
+  // Start
   boot();
 })();
 </script>
