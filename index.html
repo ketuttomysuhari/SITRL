@@ -122,7 +122,7 @@
   // ====== INIT CESIUM ======
   function initCesium() {
     const ionToken = $('ionToken').value.trim();
-    if (ionToken && ionToken !== 'PASTE_CESIUM_ION_TOKEN') Cesium.Ion.defaultAccessToken = ionToken;
+    if (ionToken && ionToken !== 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4MGZjYmVlNC01MDEwLTQ3M2ItYTU0Mi00NTljZDMwYTdhYTMiLCJpZCI6NzU1MiwiaWF0IjoxNzYyMjY3NjI0fQ._x11gbiK3ozL9DYz1WVGQDruICGCuTuhZXAglQQh7ZQ') Cesium.Ion.defaultAccessToken = ionToken;
     S.viewer = new Cesium.Viewer('app', {
       animation:false, timeline:false, geocoder:true, sceneModePicker:true, baseLayerPicker:true,
       terrain: Cesium.Terrain.fromWorldTerrain(), // Terrain global
