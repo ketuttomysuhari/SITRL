@@ -98,7 +98,7 @@
 
     <div class="tog">
       <input type="checkbox" id="togAIS" />
-      <label for="togAIS">Posisi Kapal (AIS — demo bergerak + auto-fly)</label>
+      <label for="togAIS">Posisi Kapal (AIS — banyak kapal per klaster + auto-fly)</label>
     </div>
 
     <div class="tog">
@@ -215,7 +215,7 @@
   const SHIP_ICON = 'https://e7.pngegg.com/pngimages/926/856/png-clipart-boating-yacht-boat-show-ship-boat-top-view-electronics-watch-accessory.png';
 
   let viewer, osmBuildings, gfwLayer, mspDS, aisBillboards=null, aisTimer=null, wmsLayers=[];
-  let aisHasFlown = false; // fly sekali saat AIS mulai
+  let aisHasFlown = false;
 
   function boot(){
     viewer = new Cesium.Viewer('map',{
@@ -226,9 +226,7 @@
     viewer.scene.globe.enableLighting = true;
 
     // Fokus awal Indonesia
-    viewer.camera.setView({
-      destination: Cesium.Cartesian3.fromDegrees(117, -2, 5_000_000)
-    });
+    viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(117, -2, 5_000_000) });
 
     // Auto-add OSM Buildings
     try{
@@ -270,9 +268,9 @@
     $('flyBtn').onclick = ()=> {
       const where = $('flyTo').value;
       const targets = {
-        priok:    {lon:106.884, lat:-6.109, h:2200},   // Tj. Priok
-        perak:    {lon:112.737, lat:-7.200, h:2200},   // Tj. Perak
-        makassar: {lon:119.418, lat:-5.125, h:2200}    // Makassar
+        priok:    {lon:106.884, lat:-6.109, h:2200},
+        perak:    {lon:112.737, lat:-7.200, h:2200},
+        makassar: {lon:119.418, lat:-5.125, h:2200}
       };
       const t = targets[where]||targets.priok;
       viewer.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(t.lon, t.lat, t.h), duration: 1.6 });
@@ -348,131 +346,127 @@
     setStatus('Semua layer WMS/WMTS dihapus.');
   }
 
-  // ===== AIS (dummy bergerak atau dari endpoint jika ada) =====
-  // Ikon kapal sesuai permintaan (top view)
+  // ===== AIS (dummy banyak kapal per klaster + bergerak) =====
   const SHIP_IMG = SHIP_ICON;
 
-  let DEMO_SHIPS = [
-    { name:'KM Nusantara', lon:117.10, lat:-0.80, course:45, speed:12 },
-    { name:'MV Samudra',   lon:115.90, lat:-1.50, course:90, speed:10 },
-    { name:'MT LautBiru',  lon:119.20, lat:-2.10, course:12, speed:14 }
+  // Pusat klaster: Kalimantan (pakai Balikpapan), Jakarta-Priok, Surabaya-Perak, Makassar
+  const CLUSTERS = [
+    { name:'Kalimantan (Balikpapan)', lon:116.85, lat:-1.27,  spreadKm:20, count:12 },
+    { name:'Jakarta (Tj. Priok)',     lon:106.884, lat:-6.109, spreadKm:15, count:12 },
+    { name:'Surabaya (Tj. Perak)',    lon:112.737, lat:-7.200, spreadKm:15, count:12 },
+    { name:'Makassar (S. Hatta)',     lon:119.418, lat:-5.125, spreadKm:15, count:12 }
   ];
 
+  let DEMO_SHIPS = []; // akan di-seed saat start
+  let aisHasFlown = false;
+
+  function degPerKmLat(){ return 1/110.574; }
+  function degPerKmLon(latDeg){ return 1/(111.320 * Math.cos(latDeg*Math.PI/180)); }
+
+  function randomInRange(a,b){ return a + Math.random()*(b-a); }
+
+  function seedDemoShips(){
+    DEMO_SHIPS = [];
+    for (const c of CLUSTERS){
+      const dLat = degPerKmLat();
+      const dLon = degPerKmLon(c.lat);
+      for (let i=0;i<c.count;i++){
+        const r = c.spreadKm * Math.sqrt(Math.random());  // distribusi lebih rapat di pusat
+        const t = Math.random()*Math.PI*2;
+        const offLat = r * Math.sin(t) * dLat;
+        const offLon = r * Math.cos(t) * dLon;
+        DEMO_SHIPS.push({
+          name: `${c.name} #${(i+1).toString().padStart(2,'0')}`,
+          lon: c.lon + offLon,
+          lat: c.lat + offLat,
+          course: randomInRange(0,360),
+          speed: randomInRange(6,15)   // “knot” simulatif
+        });
+      }
+    }
+  }
+
+  function updateShipMotion(){
+    // Ubah posisi sedikit berdasarkan course+speed (simulasi sederhana)
+    // 1 knot ≈ 0.00051444 km/detik. Kita pakai dt ≈ 2 detik per tick (lihat interval)
+    // Konversi km -> derajat:
+    const dt = 2; // detik
+    DEMO_SHIPS = DEMO_SHIPS.map(v=>{
+      const speedKts = v.speed;
+      const kmps = speedKts * 1.852 / 3600; // km/s
+      const dist = kmps * dt;               // km per tick
+      const dir = v.course * Math.PI/180;
+      const dNorth = Math.cos(dir)*dist; // km ke utara
+      const dEast  = Math.sin(dir)*dist; // km ke timur
+      const dLat = dNorth * degPerKmLat();
+      const dLon = dEast  * degPerKmLon(v.lat);
+
+      let lon = v.lon + dLon;
+      let lat = v.lat + dLat;
+
+      // Sedikit noise arah agar tidak terlalu kaku
+      let course = (v.course + randomInRange(-2,2) + 360) % 360;
+
+      return {...v, lon, lat, course};
+    });
+  }
+
   function onToggleAIS(e){ if (e.target.checked) startAIS(); else stopAIS(); }
+
+  let aisBillboards=null, aisTimer=null;
+
   function ensureAisLayer(){
     if (!aisBillboards){ aisBillboards = viewer.scene.primitives.add(new Cesium.BillboardCollection()); }
   }
 
+  function drawShips(ships){
+    ensureAisLayer();
+    aisBillboards.removeAll();
+    for (const v of ships){
+      aisBillboards.add({
+        position: Cesium.Cartesian3.fromDegrees(v.lon, v.lat),
+        image: SHIP_IMG,
+        scale: 0.1, // ikon besar → skala kecil
+        verticalOrigin: Cesium.VerticalOrigin.CENTER,
+        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY
+      });
+    }
+  }
+
   function flyToAISExtent(ships){
-    if (!ships.length) return;
-    // Hitung bounding dan pusat
     let minLon=+Infinity, minLat=+Infinity, maxLon=-Infinity, maxLat=-Infinity;
     ships.forEach(s=>{
       minLon = Math.min(minLon, s.lon); maxLon = Math.max(maxLon, s.lon);
       minLat = Math.min(minLat, s.lat); maxLat = Math.max(maxLat, s.lat);
     });
-    const centerLon = (minLon+maxLon)/2;
-    const centerLat = (minLat+maxLat)/2;
-
-    // Buat bounding sphere dari rectangle
     const rect = Cesium.Rectangle.fromDegrees(minLon, minLat, maxLon, maxLat);
-    viewer.camera.flyTo({
-      destination: rect,
-      duration: 1.6
-    });
-    setStatus(`AIS aktif. Posisi area kapal sekitar: lat ${centerLat.toFixed(3)}, lon ${centerLon.toFixed(3)}.`);
+    viewer.camera.flyTo({ destination: rect, duration: 1.6 });
+    const centerLon = ((minLon+maxLon)/2).toFixed(3);
+    const centerLat = ((minLat+maxLat)/2).toFixed(3);
+    setStatus(`AIS aktif (≈${ships.length} kapal) — pusat area: lat ${centerLat}, lon ${centerLon}.`);
   }
 
   async function fetchAISOnce(){
-    const url = $('mtUrl')?.value?.trim?.() || '';
-    ensureAisLayer();
-    aisBillboards.removeAll();
-
-    if (!url){
-      // Dummy bergerak (update koordinat sedikit tiap tick)
-      DEMO_SHIPS = DEMO_SHIPS.map(v=>{
-        const dLon = (Math.cos(Date.now()/30000 + v.speed)*0.02) / 60;
-        const dLat = (Math.sin(Date.now()/30000 + v.speed)*0.02) / 60;
-        return {...v, lon: v.lon + dLon, lat: v.lat + dLat};
-      });
-
-      // Plot
-      for (const v of DEMO_SHIPS){
-        aisBillboards.add({
-          position: Cesium.Cartesian3.fromDegrees(v.lon, v.lat),
-          image: SHIP_IMG,
-          scale: 0.12,                 // ikon PNG cukup besar; skala kecil
-          verticalOrigin: Cesium.VerticalOrigin.CENTER,
-          horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-          disableDepthTestDistance: Number.POSITIVE_INFINITY
-        });
-      }
-
-      // Fly sekali saat mulai
-      if (!aisHasFlown){
-        aisHasFlown = true;
-        flyToAISExtent(DEMO_SHIPS);
-      } else {
-        setStatus('Demo AIS: kapal bergerak simulatif.');
-      }
-      return;
-    }
-
-    // Jika ada endpoint—ambil data asli
-    try{
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('AIS fetch gagal: ' + res.status);
-      const data = await res.json();
-      const arr = Array.isArray(data) ? data : (data?.data || []);
-
-      const shipsPlotted = [];
-      for (const v of arr){
-        const lon = +v.lon || +v.LONGITUDE || +v.longitude;
-        const lat = +v.lat || +v.LATITUDE || +v.latitude;
-        if (isFinite(lon) && isFinite(lat)){
-          shipsPlotted.push({lon,lat});
-          aisBillboards.add({
-            position: Cesium.Cartesian3.fromDegrees(lon, lat),
-            image: SHIP_IMG,
-            scale: 0.12,
-            verticalOrigin: Cesium.VerticalOrigin.CENTER,
-            horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-            disableDepthTestDistance: Number.POSITIVE_INFINITY
-          });
-        }
-      }
-      if (!aisHasFlown && shipsPlotted.length){
-        aisHasFlown = true;
-        flyToAISExtent(shipsPlotted);
-      } else {
-        setStatus(`AIS: ${shipsPlotted.length} kapal ditampilkan.`);
-      }
-    }catch(e){
-      console.error(e);
-      setStatus('Gagal mengambil AIS endpoint. Menampilkan dummy bergerak.');
-      // fallback dummy
-      for (const v of DEMO_SHIPS){
-        aisBillboards.add({
-          position: Cesium.Cartesian3.fromDegrees(v.lon, v.lat),
-          image: SHIP_IMG,
-          scale: 0.12
-        });
-      }
-      if (!aisHasFlown){
-        aisHasFlown = true;
-        flyToAISExtent(DEMO_SHIPS);
-      }
+    // Mode dummy multi-klaster (tanpa endpoint)
+    updateShipMotion();
+    drawShips(DEMO_SHIPS);
+    if (!aisHasFlown && DEMO_SHIPS.length){
+      aisHasFlown = true;
+      flyToAISExtent(DEMO_SHIPS);
+    } else {
+      setStatus(`Demo AIS berjalan — total kapal: ${DEMO_SHIPS.length}.`);
     }
   }
 
   function startAIS(){
-    aisHasFlown = false;  // reset agar fly saat start
-    fetchAISOnce();
-    const everyMs = 2000; // update tiap 2 detik (efek bergerak)
-    stopAIS();
-    aisTimer = setInterval(fetchAISOnce, everyMs);
+    aisHasFlown = false;
+    seedDemoShips();      // spawn ulang banyak kapal di 4 klaster
+    fetchAISOnce();       // gambar pertama
+    stopAIS();            // pastikan tidak dobel interval
+    aisTimer = setInterval(fetchAISOnce, 2000); // gerak tiap 2 detik
     $('togAIS').checked = true;
-    setStatus('AIS (dummy) berjalan dan akan auto-fly ke area kapal.');
+    setStatus('AIS (dummy multi-klaster) berjalan dan akan auto-fly.');
   }
 
   function stopAIS(){
@@ -552,4 +546,3 @@
 </script>
 </body>
 </html>
-6
