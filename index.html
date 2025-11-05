@@ -23,7 +23,7 @@
   #govbar h1{font-size:16px; margin:0; font-weight:800; letter-spacing:.2px}
   #govbar small{opacity:.9; display:block; font-weight:500}
   #ui{
-    position:absolute; top:68px; left:16px; z-index:10; width:395px; max-height:calc(100% - 84px);
+    position:absolute; top:68px; left:16px; z-index:10; width:420px; max-height:calc(100% - 84px);
     background:#0b1220cc; border:1px solid var(--border); border-radius:14px; backdrop-filter: blur(6px);
     color:var(--text); overflow:auto; box-shadow:0 8px 28px rgba(0,0,0,.35);
   }
@@ -47,6 +47,12 @@
     position:absolute; right:16px; bottom:16px; z-index:5; color:var(--text); background:#0b1220cc;
     border:1px solid var(--border); border-radius:12px; padding:8px 12px; max-width:520px; font-size:12px;
   }
+  /* Tabel AIS */
+  table{width:100%; border-collapse:collapse; margin-top:8px; font-size:13px}
+  thead th{position:sticky; top:0; background:#0f2039; border-bottom:1px solid var(--border); text-align:left; padding:8px}
+  tbody td{border-bottom:1px solid #16243b; padding:6px 8px}
+  tbody tr:hover{background:#0e1830}
+  .btn-mini{padding:6px 8px; font-weight:700; border-radius:8px}
 </style>
 </head>
 <body>
@@ -57,7 +63,7 @@
   <img src="https://cdn.jsdelivr.net/gh/tabler/tabler-icons/icons/shield.svg" alt="Lambang" aria-hidden="true">
   <div>
     <h1>SITARLAUT 3D</h1>
-    <small>Sistem Informasi Tata Ruang Laut — Pemerintah</small>
+    <small>Sistem Informasi Tata Ruang Laut</small>
   </div>
 </div>
 
@@ -98,7 +104,7 @@
 
     <div class="tog">
       <input type="checkbox" id="togAIS" />
-      <label for="togAIS">Posisi Kapal (AIS — multi-klaster + ikon + label)</label>
+      <label for="togAIS">Posisi Kapal (AIS — ikon + label + tabel realtime)</label>
     </div>
 
     <div class="tog">
@@ -176,6 +182,22 @@
       </div>
       <p class="note">Jika kosong, sistem memuat <b>dummy zonasi</b> (konservasi, budidaya, alur).</p>
     </div>
+
+    <div style="height:14px"></div>
+    <div id="aisRealtime">
+      <h3 style="font-size:13px;margin:0 0 6px;color:#bcd6ff">AIS — Tabel Realtime</h3>
+      <p class="note">Klik <b>Lihat</b> untuk terbang ke kapal.</p>
+      <div style="max-height:260px; overflow:auto; border:1px solid var(--border); border-radius:10px">
+        <table>
+          <thead><tr><th>Nama</th><th>Jenis</th><th>Speed</th><th>Aksi</th></tr></thead>
+          <tbody id="aisTableBody"><tr><td colspan="4" class="note" style="padding:10px">Belum aktif. Centang “Posisi Kapal (AIS)” di tab Layer.</td></tr></tbody>
+        </table>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="btnAisFlyAll" class="btn-ghost">Fly ke Area AIS</button>
+        <button id="btnAisStop" class="btn-ghost">Matikan AIS</button>
+      </div>
+    </div>
   </div>
 
   <!-- TENTANG -->
@@ -192,11 +214,11 @@
   const $ = (id)=>document.getElementById(id);
   const setStatus = (t)=>{ $('status').textContent = 'Status: ' + t; console.log('[SITARLAUT]', t); };
 
-  // === Token Ion: milik Anda
+  // === Token Ion
   Cesium.Ion.defaultAccessToken =
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4MGZjYmVlNC01MDEwLTQ3M2ItYTU0Mi00NTljZDMwYTdhYTMiLCJpZCI6NzU1MiwiaWF0IjoxNzYyMjY3NjI0fQ._x11gbiK3ozL9DYz1WVGQDruICGCuTuhZXAglQQh7ZQ';
 
-  // === Fallback anti-blank
+  // ===== [MODULE] BASEMAP & VIEWER
   async function safeWorldTerrain() {
     try { return Cesium.Terrain.fromWorldTerrain(); }
     catch { return new Cesium.EllipsoidTerrain(); }
@@ -212,19 +234,13 @@
     il.add(new Cesium.ImageryLayer(prov));
   }
 
-  // === Ikon kapal (default & per jenis)
-  const SHIP_ICON_DEFAULT = 'https://e7.pngegg.com/pngimages/926/856/png-clipart-boating-yacht-boat-show-ship-boat-top-view-electronics-watch-accessory.png';
-  // Jika punya ikon berbeda per jenis, ganti URL di sini:
-  const SHIP_ICONS = {
-    tanker:    SHIP_ICON_DEFAULT,
-    cargo:     SHIP_ICON_DEFAULT,
-    fishing:   SHIP_ICON_DEFAULT,
-    passenger: SHIP_ICON_DEFAULT
-  };
+  // ===== [MODULE] ICONS
+  const SHIP_ICON_DEFAULT = 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Ship_font_awesome.svg/512px-Ship_font_awesome.svg.png';
+  const SHIP_ICONS = { tanker:SHIP_ICON_DEFAULT, cargo:SHIP_ICON_DEFAULT, fishing:SHIP_ICON_DEFAULT, passenger:SHIP_ICON_DEFAULT };
   function shipIconFor(type){ return SHIP_ICONS[type] || SHIP_ICON_DEFAULT; }
 
   let viewer, osmBuildings, gfwLayer, mspDS, wmsLayers=[];
-  let aisBillboards=null, aisTimer=null, aisHasFlown=false;
+  let aisBillboards=null, aisTimer=null, aisHasFlown=false, aisSelectionEntity=null;
 
   async function boot(){
     const terrain = await safeWorldTerrain();
@@ -233,20 +249,27 @@
       terrain, infoBox:true, selectionIndicator:true
     });
 
-    // Basemap default (Bing via Ion). Jika gagal (token/jaringan), pakai OSM.
-    try { /* biarkan default */ }
+    // Anti-blank basemap fallback
+    try { /* default imagery OK */ }
     catch { useOSMBase(viewer); }
+
+    // Settings visual
+    viewer.scene.globe.depthTestAgainstTerrain = false;
 
     // Fokus awal Indonesia + titik uji
     viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(117, -2, 5_000_000) });
     viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(106.845, -6.2146), point:{pixelSize:6, color:Cesium.Color.CYAN}});
 
-    // OSM Buildings auto-ON
+    // OSM Buildings auto-ON (dengan fallback & status)
     try{
-      osmBuildings = Cesium.createOsmBuildings();
+      osmBuildings = Cesium.createOsmBuildings();        // asset ion 96188
       viewer.scene.primitives.add(osmBuildings);
       setStatus('OSM Buildings aktif. Gunakan tombol Fly untuk melihat jelas.');
-    }catch(e){ console.warn('OSM Buildings gagal:', e); }
+    }catch(e){
+      console.warn('OSM Buildings gagal:', e);
+      $('togOSMB').checked = false;
+      setStatus('OSM Buildings gagal dimuat (cek token Ion & akses OSM Buildings).');
+    }
 
     wiring();
     setStatus('Siap. Gunakan Layer/Data di panel kiri.');
@@ -305,21 +328,39 @@
       viewer.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(t.lon, t.lat, t.h), duration: 1.6 });
       setStatus('Pindah kamera ke area pelabuhan.');
     };
+
+    // AIS table actions
+    $('btnAisFlyAll').onclick = ()=>{ if (DEMO_SHIPS.length) flyToAISExtent(DEMO_SHIPS); };
+    $('btnAisStop').onclick = ()=>{ stopAIS(); renderAisTable([]); };
+
+    // Delegasi klik pada tabel
+    $('aisTableBody').addEventListener('click', (ev)=>{
+      const btn = ev.target.closest('[data-goto]');
+      if (!btn) return;
+      const id = btn.getAttribute('data-goto');
+      const ship = DEMO_SHIPS.find(s=>s.id===id);
+      if (ship) focusShip(ship);
+    });
   }
 
-  // ===== OSM Buildings
+  // ===== [MODULE] OSM Buildings
   function onToggleOSMB(e){
     if (e.target.checked){
-      if (!osmBuildings){ osmBuildings = Cesium.createOsmBuildings(); }
-      viewer.scene.primitives.add(osmBuildings);
-      setStatus('OSM Buildings: ON');
+      try{
+        if (!osmBuildings){ osmBuildings = Cesium.createOsmBuildings(); }
+        viewer.scene.primitives.add(osmBuildings);
+        setStatus('OSM Buildings: ON');
+      }catch(err){
+        $('togOSMB').checked = false;
+        setStatus('OSM Buildings gagal dimuat (cek token Ion).');
+      }
     }else{
       if (osmBuildings) viewer.scene.primitives.remove(osmBuildings);
       setStatus('OSM Buildings: OFF');
     }
   }
 
-  // ===== GFW
+  // ===== [MODULE] GFW
   function enableOrSwapGFW(){
     const url = $('gfwTileUrl').value.trim() || $('gfwPreset').value;
     if (!url){ alert('Isi URL tile XYZ GFW atau pilih preset.'); return; }
@@ -339,7 +380,7 @@
     }
   }
 
-  // ===== Copernicus Marine (WMS/WMTS)
+  // ===== [MODULE] WMS/WMTS Copernicus
   function addWMS(){
     const url = $('wmsUrl').value.trim();
     const layer = $('wmsLayer').value.trim();
@@ -373,7 +414,7 @@
     setStatus('Semua layer WMS/WMTS dihapus.');
   }
 
-  // ===== AIS — multi-klaster, ikon per tipe + label
+  // ===== [MODULE] AIS — demo multi-klaster + ikon + label + tabel
   const CLUSTERS = [
     { name:'Kalimantan (Balikpapan)', lon:116.85,  lat:-1.27,  spreadKm:20, count:12 },
     { name:'Jakarta (Tj. Priok)',     lon:106.884, lat:-6.109, spreadKm:15, count:12 },
@@ -453,8 +494,6 @@
         scale: 0.10,
         verticalOrigin: Cesium.VerticalOrigin.CENTER,
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-        // Aktifkan rotasi bila ingin arah mengikuti course (screen-space):
-        // rotation: Cesium.Math.toRadians(v.course),
         disableDepthTestDistance: Number.POSITIVE_INFINITY
       });
 
@@ -479,6 +518,37 @@
     }
   }
 
+  function renderAisTable(ships){
+    const tb = $('aisTableBody');
+    if (!ships || !ships.length){
+      tb.innerHTML = `<tr><td colspan="4" class="note" style="padding:10px">Tidak ada data AIS.</td></tr>`;
+      return;
+    }
+    tb.innerHTML = ships.map(s=>`
+      <tr>
+        <td>${s.name}</td>
+        <td>${s.type}</td>
+        <td>${s.speed.toFixed(0)} kts</td>
+        <td><button class="btn-mini btn-ghost" data-goto="${s.id}">Lihat</button></td>
+      </tr>
+    `).join('');
+  }
+
+  function highlightSelection(lon, lat){
+    if (aisSelectionEntity) { viewer.entities.remove(aisSelectionEntity); aisSelectionEntity=null; }
+    aisSelectionEntity = viewer.entities.add({
+      position: Cesium.Cartesian3.fromDegrees(lon, lat, 2),
+      point: { pixelSize:10, color: Cesium.Color.CHARTREUSE, outlineColor: Cesium.Color.BLACK, outlineWidth:2 }
+    });
+  }
+
+  function focusShip(ship){
+    const dest = Cesium.Cartesian3.fromDegrees(ship.lon, ship.lat, 1200);
+    viewer.camera.flyTo({ destination: dest, duration: 1.2 });
+    highlightSelection(ship.lon, ship.lat);
+    setStatus(`Memantau: ${ship.name} — ${ship.type}, ${ship.speed.toFixed(0)} kts`);
+  }
+
   function flyToAISExtent(ships){
     let minLon=+Infinity, minLat=+Infinity, maxLon=-Infinity, maxLat=-Infinity;
     ships.forEach(s=>{
@@ -489,12 +559,13 @@
     viewer.camera.flyTo({ destination: rect, duration: 1.6 });
     const centerLon = ((minLon+maxLon)/2).toFixed(3);
     const centerLat = ((minLat+maxLat)/2).toFixed(3);
-    setStatus(`AIS aktif (≈${ships.length} kapal) — pusat area: lat ${centerLat}, lon ${centerLon}.`);
+    setStatus(`AIS aktif (≈${ships.length} kapal) — pusat: ${centerLat}, ${centerLon}.`);
   }
 
   async function fetchAISOnce(){
     updateShipMotion();
     drawShips(DEMO_SHIPS);
+    renderAisTable(DEMO_SHIPS);
     if (!aisHasFlown && DEMO_SHIPS.length){
       aisHasFlown = true;
       flyToAISExtent(DEMO_SHIPS);
@@ -507,7 +578,7 @@
     aisHasFlown = false;
     seedDemoShips();
     fetchAISOnce();
-    stopAIS(); // bersihkan interval lama
+    stopAIS(); // pastikan interval lama bersih
     aisTimer = setInterval(fetchAISOnce, 2000);
     $('togAIS').checked = true;
     setStatus('AIS (dummy multi-klaster, ikon & label) berjalan dan auto-fly.');
@@ -517,11 +588,13 @@
     if (aisTimer){ clearInterval(aisTimer); aisTimer=null; }
     if (aisBillboards){ aisBillboards.removeAll(); }
     clearAisLabels();
+    renderAisTable([]);
+    if (aisSelectionEntity){ viewer.entities.remove(aisSelectionEntity); aisSelectionEntity=null; }
     $('togAIS').checked = false;
     setStatus('AIS dimatikan.');
   }
 
-  // ===== MSP Zonasi (dummy bila URL kosong)
+  // ===== [MODULE] MSP Zonasi (dummy bila URL kosong)
   const DUMMY_ZONASI = {
     "type":"FeatureCollection",
     "features":[
@@ -587,6 +660,7 @@
   // — Tips anti blank —
   // Jalankan via http server, bukan file://
   // Cek Console (F12) jika ada error CORS/Token/CDN
+
 })();
 </script>
 </body>
