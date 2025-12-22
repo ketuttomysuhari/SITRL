@@ -22,7 +22,7 @@
     background:linear-gradient(90deg, var(--brand) 0%, var(--brand-2) 100%); color:white; box-shadow:0 2px 10px rgba(0,0,0,.25)}
   #govbar img{height:30px} #govbar h1{font-size:16px;margin:0;font-weight:800}
 
-  /* [ADD] tombol panel */
+  /* tombol panel */
   #panelBtn{
     margin-left:auto;
     width:auto;
@@ -39,7 +39,7 @@
     background:#0b1220cc; border:1px solid var(--border); border-radius:14px; backdrop-filter: blur(6px);
     color:var(--text); overflow:auto; box-shadow:0 8px 28px rgba(0,0,0,.35)}
 
-  /* [ADD] state hide/unhide panel */
+  /* state hide/unhide panel */
   #ui.hidden{display:none}
   #panelFab{
     position:absolute; top:68px; left:16px; z-index:11;
@@ -80,7 +80,7 @@
   input[type="file"]{padding:6px 10px}
   .hr{border:0;border-top:1px solid var(--border); margin:12px 0}
 
-  /* [ADD] daftar layer */
+  /* daftar layer */
   .layerList{border:1px solid var(--border); border-radius:12px; overflow:hidden; background:#0f1a2b}
   .layerRow{
     display:grid;
@@ -89,8 +89,10 @@
     align-items:center;
     padding:8px 10px;
     border-bottom:1px solid #16243b;
+    cursor:pointer;
   }
   .layerRow:last-child{border-bottom:0}
+  .layerRow:hover{background:#0e1830}
   .layerName{font-size:12px; color:#e6eef9; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
   .layerMeta{font-size:11px; color:var(--muted)}
   .layerBtn{
@@ -115,15 +117,11 @@
 <!-- Header -->
 <div id="govbar">
   <img src="IMG_0966.png" alt="">
-  <div>
-    <h1>Ocean Monitoring System</h1>
-  </div>
-
-  <!-- [ADD] hide/unhide sidebar -->
+  <div><h1>Ocean Monitoring System</h1></div>
   <button id="panelBtn" type="button">Panel</button>
 </div>
 
-<!-- [ADD] tombol floating saat panel disembunyikan -->
+<!-- tombol floating saat panel disembunyikan -->
 <button id="panelFab" type="button" aria-label="Tampilkan Panel">Panel</button>
 
 <!-- Sidebar -->
@@ -192,10 +190,10 @@
       <button id="btnShpQuickGili" class="btn-ghost">Quick: Gili Matra</button>
     </div>
 
-    <!-- [ADD] Quick AOI + Buffer -->
+    <!-- AOI DIHAPUS. Buffer tetap ada -->
     <div class="row" style="margin-top:8px">
-      <button id="btnShpQuickAOI" class="btn-ghost">Quick: AOI</button>
       <button id="btnShpQuickBuffer" class="btn-ghost">Quick: Buffer</button>
+      <button class="btn-ghost" type="button" disabled style="opacity:.55; cursor:not-allowed">AOI (removed)</button>
     </div>
 
     <div class="row" style="margin-top:8px">
@@ -214,19 +212,17 @@
       Jika file ZIP di server memiliki spasi, gunakan <b>%20</b> pada URL atau rename file tanpa spasi.
     </p>
 
-    <!-- [ADD] daftar layer yang sudah dimuat -->
     <hr class="hr">
     <h2>Daftar Layer SHP</h2>
-    <div class="sub">Centang untuk tampil/sembunyi. “Zoom” untuk fokus ke layer.</div>
+    <div class="sub">Centang untuk tampil/sembunyi. Klik baris layer untuk zoom (atau tombol “Zoom”).</div>
     <div id="shpLayerList" class="layerList">
-      <div class="layerRow">
+      <div class="layerRow" style="cursor:default">
         <div></div>
         <div class="layerMeta">Belum ada layer SHP dimuat.</div>
         <div></div>
         <div></div>
       </div>
     </div>
-
   </div>
 
   <!-- DATA -->
@@ -262,7 +258,7 @@
   const $ = (id)=>document.getElementById(id);
   const setStatus = (t)=>{ $('status').textContent = 'Status: ' + t; console.log('[SITARLAUT]', t); };
 
-  // ===== [ADD] Panel hide/unhide (sidebar)
+  // Panel hide/unhide
   const ui = $('ui');
   const fab = $('panelFab');
   function setPanelVisible(visible){
@@ -271,12 +267,11 @@
   }
   $('panelBtn').addEventListener('click', ()=> setPanelVisible(ui.classList.contains('hidden')));
   fab.addEventListener('click', ()=> setPanelVisible(true));
-  // ===== [/ADD]
 
-  // === Ion token
+  // Ion token
   Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4MGZjYmVlNC01MDEwLTQ3M2ItYTU0Mi00NTljZDMwYTdhYTMiLCJpZCI6NzU1MiwiaWF0IjoxNzYyMjY3NjI0fQ._x11gbiK3ozL9DYz1WVGQDruICGCuTuhZXAglQQh7ZQ';
 
-  // ===== Viewer
+  // Viewer
   const viewer = new Cesium.Viewer('map', {
     terrain: Cesium.Terrain.fromWorldTerrain(),
     animation:false, timeline:false, geocoder:true, baseLayerPicker:false, sceneModePicker:true,
@@ -287,7 +282,7 @@
   // Fokus Indonesia
   viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(117.0, -2.0, 5_000_000) });
 
-  // ===== Building tileset
+  // Building tileset
   let buildings = null;
   (async () => {
     try{
@@ -323,7 +318,7 @@
     });
   };
 
-  // ===== Tabs
+  // Tabs
   [['tabLayers','paneLayers'],['tabData','paneData'],['tabTentang','paneTentang']].forEach(([tab,pane])=>{
     $(tab).onclick = ()=>{
       ['paneLayers','paneData','paneTentang'].forEach(p=>$(p).hidden = p!==pane);
@@ -331,7 +326,7 @@
     };
   });
 
-  // ===== AIS (kode Anda tetap; dipersingkat untuk fokus SHP)
+  // ===== AIS (dipertahankan dari versi Anda)
   const SHIP_ICON_PAGE = 'https://www.flaticon.com/free-icon/transport_10956885?term=ship&page=4&position=21&origin=tag&related_id=10956885';
   const SHIP_ICON_DIRECT = '';
   const SHIP_FALLBACK_SVG =
@@ -502,7 +497,7 @@
     const ship = DEMO_SHIPS.find(s=>s.id===id); if (ship) focusShip(ship);
   });
 
-  // ===== SHP MULTI-LAYER MANAGER (tampil per layer + hide/unhide)
+  // ===== SHP MULTI-LAYER MANAGER
   const shpLayers = new Map(); // key -> { ds, name, count }
   let shpSeq = 0;
 
@@ -582,7 +577,7 @@
 
     if (!items.length){
       box.innerHTML = `
-        <div class="layerRow">
+        <div class="layerRow" style="cursor:default">
           <div></div>
           <div class="layerMeta">Belum ada layer SHP dimuat.</div>
           <div></div><div></div>
@@ -593,14 +588,14 @@
     box.innerHTML = items.map(([key, it])=>{
       const checked = it.ds.show ? 'checked' : '';
       return `
-        <div class="layerRow" data-key="${key}">
+        <div class="layerRow" data-key="${key}" title="Klik baris untuk zoom">
           <input type="checkbox" ${checked} aria-label="Tampilkan ${it.name}">
           <div>
             <div class="layerName" title="${it.name}">${it.name}</div>
             <div class="layerMeta">${it.count} entity</div>
           </div>
-          <button class="layerBtn" data-act="zoom">Zoom</button>
-          <button class="layerBtn danger" data-act="remove">Remove</button>
+          <button class="layerBtn" data-act="zoom" type="button">Zoom</button>
+          <button class="layerBtn danger" data-act="remove" type="button">Remove</button>
         </div>`;
     }).join('');
   }
@@ -616,6 +611,8 @@
     shpLayers.set(key, { ds, name: layerName, count });
     updateLayerListUI();
 
+    // Setelah add: langsung zoom ke layer baru (agar terasa "klik shp -> zoom")
+    try { await viewer.zoomTo(ds); } catch {}
     return ds;
   }
 
@@ -686,17 +683,13 @@
     }
   });
 
-  // Quick buttons: pastikan path URL sesuai lokasi file di server Anda
+  // Quick buttons (AOI dihapus)
   $('btnShpQuickSawu').addEventListener('click', ()=>{
     $('shpZipUrl').value = 'SHP%20Sawu.zip';
     $('btnShpLoadUrl').click();
   });
   $('btnShpQuickGili').addEventListener('click', ()=>{
     $('shpZipUrl').value = 'SHP%20Gili_Matra.zip';
-    $('btnShpLoadUrl').click();
-  });
-  $('btnShpQuickAOI').addEventListener('click', ()=>{
-    $('shpZipUrl').value = 'AOI%20SHP-20251222T004202Z-3-001.zip';
     $('btnShpLoadUrl').click();
   });
   $('btnShpQuickBuffer').addEventListener('click', ()=>{
@@ -714,7 +707,11 @@
   $('shpFill').addEventListener('input', restyleAll);
   $('shpOpacity').addEventListener('input', restyleAll);
 
-  // Layer list actions: show/hide, zoom, remove
+  // Layer list actions:
+  // - Checkbox: show/hide
+  // - Klik baris (selain tombol/checkbox): zoom ke layer
+  // - Tombol Zoom: zoom
+  // - Tombol Remove: hapus
   $('shpLayerList').addEventListener('click', async (ev)=>{
     const row = ev.target.closest('.layerRow');
     if (!row) return;
@@ -722,38 +719,39 @@
     if (!key || !shpLayers.has(key)) return;
 
     const it = shpLayers.get(key);
-    const actBtn = ev.target.closest('button[data-act]');
-    if (!actBtn) return;
 
-    const act = actBtn.getAttribute('data-act');
-    if (act === 'zoom'){
-      await viewer.zoomTo(it.ds);
-      setStatus(`Zoom: ${it.name}`);
-    }
-    if (act === 'remove'){
-      viewer.dataSources.remove(it.ds, true);
-      shpLayers.delete(key);
-      updateLayerListUI();
-      setStatus(`Remove: ${it.name}`);
-    }
-  });
-
-  $('shpLayerList').addEventListener('change', (ev)=>{
-    const row = ev.target.closest('.layerRow');
-    if (!row) return;
-    const key = row.getAttribute('data-key');
-    if (!key || !shpLayers.has(key)) return;
-
-    const it = shpLayers.get(key);
+    // Checkbox toggle
     const cb = ev.target.closest('input[type="checkbox"]');
-    if (!cb) return;
+    if (cb){
+      it.ds.show = cb.checked;
+      setStatus(`${it.ds.show ? 'Tampil' : 'Sembunyi'}: ${it.name}`);
+      return;
+    }
 
-    it.ds.show = cb.checked;
-    setStatus(`${cb.checked ? 'Tampil' : 'Sembunyi'}: ${it.name}`);
+    // Button action
+    const actBtn = ev.target.closest('button[data-act]');
+    if (actBtn){
+      const act = actBtn.getAttribute('data-act');
+      if (act === 'zoom'){
+        await viewer.zoomTo(it.ds);
+        setStatus(`Zoom: ${it.name}`);
+        return;
+      }
+      if (act === 'remove'){
+        viewer.dataSources.remove(it.ds, true);
+        shpLayers.delete(key);
+        updateLayerListUI();
+        setStatus(`Layer dihapus: ${it.name}`);
+        return;
+      }
+    }
+
+    // Default: klik baris => zoom (ini yang Anda minta)
+    await viewer.zoomTo(it.ds);
+    setStatus(`Zoom: ${it.name}`);
   });
 
-  // Info awal
-  setStatus('Siap. Building tileset ON. Aktifkan AIS untuk ikon Flaticon. Load SHP akan masuk ke Daftar Layer.');
+  setStatus('Siap. Upload/Load SHP untuk melihat layer dan klik baris layer untuk zoom.');
 })();
 </script>
 </body>
