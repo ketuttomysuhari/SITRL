@@ -9,6 +9,9 @@
 <link href="https://cesium.com/downloads/cesiumjs/releases/1.135/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
 <script src="https://cesium.com/downloads/cesiumjs/releases/1.135/Build/Cesium/Cesium.js"></script>
 
+<!-- [ADD] SHP(ZIP) -> GeoJSON in browser -->
+<script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
+
 <style>
   :root{
     --bg:#0b1220; --panel:#0f1a2b; --border:#1f2d44; --text:#e6eef9; --muted:#97a6bf;
@@ -40,6 +43,10 @@
   tbody td{border-bottom:1px solid #16243b; padding:6px 8px}
   tbody tr:hover{background:#0e1830}
   .btn-mini{padding:6px 8px; font-weight:700; border-radius:8px}
+
+  /* [ADD] kecilkan input file agar rapi */
+  input[type="file"]{padding:6px 10px}
+  .hr{border:0;border-top:1px solid var(--border); margin:12px 0}
 </style>
 </head>
 <body>
@@ -88,6 +95,60 @@
       <input type="checkbox" id="togAIS" />
       <label for="togAIS">Posisi Kapal (AIS — ikon Flaticon + label + tabel)</label>
     </div>
+
+    <!-- [ADD] UI SHP -->
+    <hr class="hr">
+
+    <h2>Tambah Data SHP (ZIP)</h2>
+    <div class="sub">Upload SHP dalam bentuk <b>.zip</b> (wajib: shp+shx+dbf; ideal: prj). Akan dimuat sebagai GeoJSON.</div>
+
+    <div class="row">
+      <div>
+        <label>Upload ZIP (lokal)</label>
+        <input id="shpZipInput" type="file" accept=".zip" />
+      </div>
+      <div style="align-self:end">
+        <button id="btnShpLoadLocal" class="btn-ghost" disabled>Load</button>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:8px">
+      <div>
+        <label>Load dari URL (server)</label>
+        <input id="shpZipUrl" type="text" placeholder="/data/SHP%20Sawu.zip" value="/data/SHP%20Sawu.zip" />
+      </div>
+      <div style="align-self:end">
+        <button id="btnShpLoadUrl" class="btn-ghost">Load</button>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:8px">
+      <button id="btnShpQuickSawu" class="btn-ghost">Quick: Sawu</button>
+      <button id="btnShpQuickGili" class="btn-ghost">Quick: Gili Matra</button>
+    </div>
+
+    <div class="row" style="margin-top:8px">
+      <div>
+        <label>Warna</label>
+        <input id="shpFill" type="text" value="#1e90ff" />
+      </div>
+      <div>
+        <label>Opacity (0–1)</label>
+        <input id="shpOpacity" type="number" min="0" max="1" step="0.05" value="0.35" />
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:8px">
+      <button id="btnShpZoom" class="btn-ghost">Zoom ke SHP</button>
+      <button id="btnShpClear" class="btn-ghost">Hapus SHP</button>
+    </div>
+
+    <p class="note" style="margin-top:8px">
+      Label otomatis mencoba atribut: <b>NAME/Name/name/NAMA/nama</b>.
+      Jika file ZIP di server memiliki spasi, gunakan <b>%20</b> pada URL atau rename file tanpa spasi.
+    </p>
+    <!-- [/ADD] UI SHP -->
+
   </div>
 
   <!-- DATA -->
@@ -363,6 +424,187 @@
     const id = btn.getAttribute('data-goto');
     const ship = DEMO_SHIPS.find(s=>s.id===id); if (ship) focusShip(ship);
   });
+
+  // ===== [ADD] SHP Loader (ZIP -> GeoJSON -> Cesium) =====
+  let shpDataSource = null;
+
+  function clamp01(x){
+    const v = Number(x);
+    if (!Number.isFinite(v)) return 0.35;
+    return Math.max(0, Math.min(1, v));
+  }
+
+  function getLabelTextFromProps(props){
+    if (!props) return '';
+    const keys = ['NAME','Name','name','NAMA','nama'];
+    for (const k of keys){
+      if (props[k] !== undefined && props[k] !== null && String(props[k]).trim() !== ''){
+        return String(props[k]);
+      }
+    }
+    return '';
+  }
+
+  function applyShpStyle(ds){
+    const fillCss = $('shpFill')?.value || '#1e90ff';
+    const op = clamp01($('shpOpacity')?.value);
+
+    let fill, line, outline;
+    try{
+      fill = Cesium.Color.fromCssColorString(fillCss).withAlpha(op);
+      line = Cesium.Color.fromCssColorString(fillCss).withAlpha(0.9);
+      outline = Cesium.Color.BLACK.withAlpha(0.9);
+    }catch{
+      fill = Cesium.Color.DODGERBLUE.withAlpha(op);
+      line = Cesium.Color.DODGERBLUE.withAlpha(0.9);
+      outline = Cesium.Color.BLACK.withAlpha(0.9);
+    }
+
+    const now = Cesium.JulianDate.now();
+    const ents = ds.entities.values;
+
+    for (const e of ents){
+      if (e.polygon){
+        e.polygon.material = fill;
+        e.polygon.outline = true;
+        e.polygon.outlineColor = outline;
+      }
+      if (e.polyline){
+        e.polyline.material = line;
+        e.polyline.width = 2.0;
+        e.polyline.clampToGround = true;
+      }
+      if (e.point){
+        e.point.color = line;
+        e.point.pixelSize = 8;
+        e.point.outlineColor = Cesium.Color.BLACK;
+        e.point.outlineWidth = 2;
+        e.point.disableDepthTestDistance = Number.POSITIVE_INFINITY;
+      }
+
+      // label (opsional)
+      const props = e.properties ? e.properties.getValue(now) : null;
+      const text = getLabelTextFromProps(props);
+      if (text){
+        e.label = new Cesium.LabelGraphics({
+          text,
+          font: '12px sans-serif',
+          fillColor: Cesium.Color.WHITE,
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 2,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          showBackground: true,
+          backgroundColor: new Cesium.Color(0,0,0,0.55),
+          backgroundPadding: new Cesium.Cartesian2(6,4),
+          pixelOffset: new Cesium.Cartesian2(0, -18),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY
+        });
+      }
+    }
+  }
+
+  async function clearShp(){
+    if (shpDataSource){
+      viewer.dataSources.remove(shpDataSource, true);
+      shpDataSource = null;
+    }
+  }
+
+  async function loadShpFromArrayBuffer(ab, name){
+    await clearShp();
+
+    if (typeof shp !== 'function'){
+      setStatus('SHP loader belum siap (shpjs tidak termuat).');
+      return;
+    }
+
+    setStatus(`Memuat SHP: ${name}\nKonversi ZIP -> GeoJSON...`);
+    const geojson = await shp(ab);
+
+    setStatus(`Memuat GeoJSON ke Cesium (clampToGround)...`);
+    shpDataSource = await Cesium.GeoJsonDataSource.load(geojson, { clampToGround: true });
+    viewer.dataSources.add(shpDataSource);
+
+    applyShpStyle(shpDataSource);
+
+    setStatus(`SHP dimuat: ${name}\nEntities: ${shpDataSource.entities.values.length}\nZooming...`);
+    await viewer.zoomTo(shpDataSource);
+    setStatus(`SHP siap: ${name} (Entities: ${shpDataSource.entities.values.length})`);
+  }
+
+  async function loadShpFromFile(file){
+    if (!file) return;
+    const ab = await file.arrayBuffer();
+    await loadShpFromArrayBuffer(ab, file.name);
+  }
+
+  async function loadShpFromUrl(url){
+    if (!url) return;
+    setStatus(`Mengunduh ZIP SHP...\n${url}`);
+    const res = await fetch(url, { cache: 'no-cache' });
+    if (!res.ok){
+      throw new Error(`HTTP ${res.status} saat mengunduh: ${url}`);
+    }
+    const ab = await res.arrayBuffer();
+    await loadShpFromArrayBuffer(ab, url);
+  }
+
+  // hook UI
+  const shpInput = $('shpZipInput');
+  const btnLocal = $('btnShpLoadLocal');
+  if (shpInput && btnLocal){
+    shpInput.addEventListener('change', ()=>{
+      btnLocal.disabled = !(shpInput.files && shpInput.files[0]);
+    });
+    btnLocal.addEventListener('click', async ()=>{
+      try{
+        const f = shpInput.files && shpInput.files[0];
+        if (!f) return;
+        await loadShpFromFile(f);
+      }catch(e){
+        console.warn(e);
+        setStatus('Gagal load SHP dari file. Pastikan ZIP berisi shp+shx+dbf (dan prj).');
+      }
+    });
+  }
+
+  $('btnShpLoadUrl')?.addEventListener('click', async ()=>{
+    try{
+      const url = $('shpZipUrl').value.trim();
+      await loadShpFromUrl(url);
+    }catch(e){
+      console.warn(e);
+      setStatus(`Gagal load SHP dari URL.\n${e.message || e}\n\nJika nama file ada spasi, gunakan %20 atau rename file.`);
+    }
+  });
+
+  $('btnShpQuickSawu')?.addEventListener('click', ()=>{
+    $('shpZipUrl').value = 'SHP%20Sawu.zip';
+    $('btnShpLoadUrl').click();
+  });
+
+  $('btnShpQuickGili')?.addEventListener('click', ()=>{
+    $('shpZipUrl').value = 'SHP%20Gili_Matra.zip';
+    $('btnShpLoadUrl').click();
+  });
+
+  $('btnShpClear')?.addEventListener('click', async ()=>{
+    await clearShp();
+    setStatus('Layer SHP dihapus.');
+  });
+
+  $('btnShpZoom')?.addEventListener('click', async ()=>{
+    if (!shpDataSource){
+      setStatus('Belum ada layer SHP.');
+      return;
+    }
+    await viewer.zoomTo(shpDataSource);
+    setStatus('Zoom ke layer SHP.');
+  });
+
+  $('shpFill')?.addEventListener('input', ()=>{ if (shpDataSource) applyShpStyle(shpDataSource); });
+  $('shpOpacity')?.addEventListener('input', ()=>{ if (shpDataSource) applyShpStyle(shpDataSource); });
+  // ===== [/ADD] SHP Loader =====
 
   // Info awal
   setStatus('Siap. Building tileset ON. Aktifkan AIS untuk ikon Flaticon.');
