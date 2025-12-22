@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Ocean Monitoring System</title>
 
-<!-- CesiumJS 1.135 (biar cocok dengan contoh tileset-mu) -->
+<!-- CesiumJS 1.135 -->
 <link href="https://cesium.com/downloads/cesiumjs/releases/1.135/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
 <script src="https://cesium.com/downloads/cesiumjs/releases/1.135/Build/Cesium/Cesium.js"></script>
 
-<!-- [ADD] SHP(ZIP) -> GeoJSON in browser -->
+<!-- SHP(ZIP) -> GeoJSON in browser -->
 <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
 
 <style>
@@ -20,10 +20,43 @@
   html,body,#map{height:100%;margin:0;background:var(--bg);font:14px/1.4 "Inter",system-ui,Segoe UI,Roboto,Arial,sans-serif}
   #govbar{position:absolute; top:0; left:0; right:0; height:56px; z-index:12; display:flex; align-items:center; gap:10px; padding:0 16px;
     background:linear-gradient(90deg, var(--brand) 0%, var(--brand-2) 100%); color:white; box-shadow:0 2px 10px rgba(0,0,0,.25)}
-  #govbar img{height:30px} #govbar h1{font-size:16px;margin:0;font-weight:800} #govbar small{opacity:.9;display:block;font-weight:500}
+  #govbar img{height:30px} #govbar h1{font-size:16px;margin:0;font-weight:800}
+
+  /* [ADD] tombol panel */
+  #panelBtn{
+    margin-left:auto;
+    width:auto;
+    padding:8px 10px;
+    border-radius:10px;
+    border:1px solid rgba(255,255,255,.25);
+    background:rgba(0,0,0,.18);
+    color:#fff;
+    font-weight:800;
+    cursor:pointer;
+  }
+
   #ui{position:absolute; top:68px; left:16px; z-index:10; width:420px; max-height:calc(100% - 84px);
     background:#0b1220cc; border:1px solid var(--border); border-radius:14px; backdrop-filter: blur(6px);
     color:var(--text); overflow:auto; box-shadow:0 8px 28px rgba(0,0,0,.35)}
+
+  /* [ADD] state hide/unhide panel */
+  #ui.hidden{display:none}
+  #panelFab{
+    position:absolute; top:68px; left:16px; z-index:11;
+    display:none;
+    width:auto;
+    padding:10px 12px;
+    border-radius:12px;
+    border:1px solid var(--border);
+    background:#0b1220cc;
+    color:var(--text);
+    font-weight:800;
+    cursor:pointer;
+    backdrop-filter: blur(6px);
+    box-shadow:0 8px 28px rgba(0,0,0,.35);
+  }
+  #panelFab.show{display:inline-flex; align-items:center; gap:8px}
+
   .tabs{display:flex; gap:6px; padding:10px 12px; border-bottom:1px solid var(--border)}
   .tab{flex:1; text-align:center; padding:8px 10px; border-radius:10px; cursor:pointer; background:#0e1830; color:#cfe3ff; border:1px solid #182746; font-weight:700}
   .tab.active{background:#14325c; border-color:#224e88}
@@ -37,16 +70,43 @@
   .row{display:flex; gap:8px} .row>*{flex:1}
   .note{font-size:12px; color:var(--muted)}
   #status{position:absolute; right:16px; bottom:16px; z-index:5; color:var(--text); background:#0b1220cc; border:1px solid var(--border); border-radius:12px; padding:8px 12px; max-width:520px; font-size:12px}
-  /* Tabel AIS */
+
   table{width:100%; border-collapse:collapse; margin-top:8px; font-size:13px}
   thead th{position:sticky; top:0; background:#0f2039; border-bottom:1px solid var(--border); text-align:left; padding:8px}
   tbody td{border-bottom:1px solid #16243b; padding:6px 8px}
   tbody tr:hover{background:#0e1830}
   .btn-mini{padding:6px 8px; font-weight:700; border-radius:8px}
 
-  /* [ADD] kecilkan input file agar rapi */
   input[type="file"]{padding:6px 10px}
   .hr{border:0;border-top:1px solid var(--border); margin:12px 0}
+
+  /* [ADD] daftar layer */
+  .layerList{border:1px solid var(--border); border-radius:12px; overflow:hidden; background:#0f1a2b}
+  .layerRow{
+    display:grid;
+    grid-template-columns: 22px 1fr 58px 72px;
+    gap:8px;
+    align-items:center;
+    padding:8px 10px;
+    border-bottom:1px solid #16243b;
+  }
+  .layerRow:last-child{border-bottom:0}
+  .layerName{font-size:12px; color:#e6eef9; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .layerMeta{font-size:11px; color:var(--muted)}
+  .layerBtn{
+    width:100%;
+    padding:6px 8px;
+    border-radius:10px;
+    border:1px solid #20324d;
+    background:#112038;
+    color:var(--text);
+    font-weight:800;
+    cursor:pointer;
+  }
+  .layerBtn.danger{
+    border-color: rgba(231,76,60,.35);
+    background: rgba(231,76,60,.14);
+  }
 </style>
 </head>
 <body>
@@ -58,7 +118,13 @@
   <div>
     <h1>Ocean Monitoring System</h1>
   </div>
+
+  <!-- [ADD] hide/unhide sidebar -->
+  <button id="panelBtn" type="button">Panel</button>
 </div>
+
+<!-- [ADD] tombol floating saat panel disembunyikan -->
+<button id="panelFab" type="button" aria-label="Tampilkan Panel">Panel</button>
 
 <!-- Sidebar -->
 <div id="ui" role="region" aria-label="Panel Pengaturan">
@@ -96,7 +162,6 @@
       <label for="togAIS">Posisi Kapal (AIS — ikon Flaticon + label + tabel)</label>
     </div>
 
-    <!-- [ADD] UI SHP -->
     <hr class="hr">
 
     <h2>Tambah Data SHP (ZIP)</h2>
@@ -127,6 +192,12 @@
       <button id="btnShpQuickGili" class="btn-ghost">Quick: Gili Matra</button>
     </div>
 
+    <!-- [ADD] Quick AOI + Buffer -->
+    <div class="row" style="margin-top:8px">
+      <button id="btnShpQuickAOI" class="btn-ghost">Quick: AOI</button>
+      <button id="btnShpQuickBuffer" class="btn-ghost">Quick: Buffer</button>
+    </div>
+
     <div class="row" style="margin-top:8px">
       <div>
         <label>Warna</label>
@@ -138,16 +209,23 @@
       </div>
     </div>
 
-    <div class="row" style="margin-top:8px">
-      <button id="btnShpZoom" class="btn-ghost">Zoom ke SHP</button>
-      <button id="btnShpClear" class="btn-ghost">Hapus SHP</button>
-    </div>
-
     <p class="note" style="margin-top:8px">
       Label otomatis mencoba atribut: <b>NAME/Name/name/NAMA/nama</b>.
       Jika file ZIP di server memiliki spasi, gunakan <b>%20</b> pada URL atau rename file tanpa spasi.
     </p>
-    <!-- [/ADD] UI SHP -->
+
+    <!-- [ADD] daftar layer yang sudah dimuat -->
+    <hr class="hr">
+    <h2>Daftar Layer SHP</h2>
+    <div class="sub">Centang untuk tampil/sembunyi. “Zoom” untuk fokus ke layer.</div>
+    <div id="shpLayerList" class="layerList">
+      <div class="layerRow">
+        <div></div>
+        <div class="layerMeta">Belum ada layer SHP dimuat.</div>
+        <div></div>
+        <div></div>
+      </div>
+    </div>
 
   </div>
 
@@ -173,7 +251,7 @@
   <!-- TENTANG -->
   <div id="paneTentang" class="section" hidden>
     <h2>Tentang</h2>
-    <p class="note">SITARLAUT 3D: integrasi building tileset + AIS dengan fokus Indonesia.</p>
+    <p class="note">SITARLAUT 3D: integrasi building tileset + AIS + SHP ZIP (GeoJSON).</p>
   </div>
 </div>
 
@@ -184,7 +262,18 @@
   const $ = (id)=>document.getElementById(id);
   const setStatus = (t)=>{ $('status').textContent = 'Status: ' + t; console.log('[SITARLAUT]', t); };
 
-  // === Ion token (ganti dengan yang berakses OSM Buildings bila perlu)
+  // ===== [ADD] Panel hide/unhide (sidebar)
+  const ui = $('ui');
+  const fab = $('panelFab');
+  function setPanelVisible(visible){
+    ui.classList.toggle('hidden', !visible);
+    fab.classList.toggle('show', !visible);
+  }
+  $('panelBtn').addEventListener('click', ()=> setPanelVisible(ui.classList.contains('hidden')));
+  fab.addEventListener('click', ()=> setPanelVisible(true));
+  // ===== [/ADD]
+
+  // === Ion token
   Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4MGZjYmVlNC01MDEwLTQ3M2ItYTU0Mi00NTljZDMwYTdhYTMiLCJpZCI6NzU1MiwiaWF0IjoxNzYyMjY3NjI0fQ._x11gbiK3ozL9DYz1WVGQDruICGCuTuhZXAglQQh7ZQ';
 
   // ===== Viewer
@@ -198,11 +287,11 @@
   // Fokus Indonesia
   viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(117.0, -2.0, 5_000_000) });
 
-  // ===== Building tileset (OSM 3D Tiles) — fokus Indonesia
+  // ===== Building tileset
   let buildings = null;
   (async () => {
     try{
-      buildings = await Cesium.createOsmBuildingsAsync(); // tileset
+      buildings = await Cesium.createOsmBuildingsAsync();
       viewer.scene.primitives.add(buildings);
       setStatus('Building tileset aktif. Fly ke pelabuhan untuk melihat detail.');
     }catch(e){
@@ -218,7 +307,7 @@
     setStatus('Building tileset: ' + (buildings.show? 'ON':'OFF'));
   });
 
-  // Preset fly Indonesia
+  // Preset fly
   const FLY = {
     priok:      {lon:106.884, lat:-6.109, h:2200},
     perak:      {lon:112.737, lat:-7.200, h:2200},
@@ -242,20 +331,15 @@
     };
   });
 
-  // ===== AIS (ikon Flaticon + label + tabel)
-  // URL dari Flaticon (halaman) biasanya bukan URL gambar langsung.
-  // Kita preload: jika gagal (CORS/hotlink), fallback ke SVG data-URI supaya tetap tampil.
+  // ===== AIS (kode Anda tetap; dipersingkat untuk fokus SHP)
   const SHIP_ICON_PAGE = 'https://www.flaticon.com/free-icon/transport_10956885?term=ship&page=4&position=21&origin=tag&related_id=10956885';
-  // Opsional: isi dengan URL PNG langsung (lebih aman) jika kamu punya:
-  const SHIP_ICON_DIRECT = ''; // contoh: 'https://cdn-icons-png.flaticon.com/512/10956/10956885.png'
-
+  const SHIP_ICON_DIRECT = '';
   const SHIP_FALLBACK_SVG =
     'data:image/svg+xml;utf8,' +
     encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
       <path d="M8 38l24-10 24 10-6 16H14L8 38z" fill="#1e90ff"/>
       <path d="M32 10l10 16H22L32 10z" fill="#0c5adb"/>
     </svg>`);
-
   let shipImage = null;
   function preloadShipIcon(){
     return new Promise(res=>{
@@ -316,7 +400,6 @@
       return {...v, lon: v.lon + dLon, lat: v.lat + dLat, course: (v.course + rrand(-2,2)+360)%360};
     });
   }
-
   function ensureAisLayer(){
     if (!aisBillboards) aisBillboards = viewer.scene.primitives.add(new Cesium.BillboardCollection());
     if (!viewer.entities._aisLabelsGroup) viewer.entities._aisLabelsGroup = [];
@@ -326,7 +409,6 @@
     for (const e of g) viewer.entities.remove(e);
     viewer.entities._aisLabelsGroup = [];
   }
-
   function drawShips(ships){
     ensureAisLayer();
     aisBillboards.removeAll();
@@ -359,7 +441,6 @@
       viewer.entities._aisLabelsGroup.push(label);
     }
   }
-
   function renderAisTable(ships){
     const tb = $('aisTableBody');
     tb.innerHTML = (ships && ships.length)
@@ -370,7 +451,6 @@
         </tr>`).join('')
       : `<tr><td colspan="4" class="note" style="padding:10px">Tidak ada data AIS.</td></tr>`;
   }
-
   function highlightSelection(lon, lat){
     if (aisSelection) { viewer.entities.remove(aisSelection); aisSelection=null; }
     aisSelection = viewer.entities.add({
@@ -389,7 +469,6 @@
     const rect = Cesium.Rectangle.fromDegrees(minLon, minLat, maxLon, maxLat);
     viewer.camera.flyTo({ destination: rect, duration: 1.2 });
   }
-
   async function fetchAISOnce(){
     updateShipMotion();
     drawShips(DEMO_SHIPS);
@@ -397,10 +476,10 @@
     if (!aisHasFlown && DEMO_SHIPS.length){ aisHasFlown = true; flyToAISExtent(DEMO_SHIPS); }
   }
   async function startAIS(){
-    await preloadShipIcon();            // muat ikon flaticon (atau fallback)
+    await preloadShipIcon();
     seedDemoShips();
     fetchAISOnce();
-    stopAIS();                          // bersihkan interval lama jika ada
+    stopAIS();
     aisTimer = setInterval(fetchAISOnce, 2000);
     $('togAIS').checked = true;
     setStatus('AIS berjalan (ikon Flaticon).');
@@ -414,8 +493,6 @@
     $('togAIS').checked = false;
     setStatus('AIS dimatikan.');
   }
-
-  // Toggle AIS + tabel actions
   $('togAIS').addEventListener('change', e=> e.target.checked ? startAIS() : stopAIS());
   $('btnAisFlyAll').onclick = ()=>{ if (DEMO_SHIPS.length) flyToAISExtent(DEMO_SHIPS); };
   $('btnAisStop').onclick = ()=> stopAIS();
@@ -425,13 +502,18 @@
     const ship = DEMO_SHIPS.find(s=>s.id===id); if (ship) focusShip(ship);
   });
 
-  // ===== [ADD] SHP Loader (ZIP -> GeoJSON -> Cesium) =====
-  let shpDataSource = null;
+  // ===== SHP MULTI-LAYER MANAGER (tampil per layer + hide/unhide)
+  const shpLayers = new Map(); // key -> { ds, name, count }
+  let shpSeq = 0;
 
-  function clamp01(x){
-    const v = Number(x);
-    if (!Number.isFinite(v)) return 0.35;
-    return Math.max(0, Math.min(1, v));
+  function clamp01(v){
+    const n = Number(v);
+    if (!Number.isFinite(n)) return 0.35;
+    return Math.max(0, Math.min(1, n));
+  }
+  function safeCssColor(css, alpha){
+    try { return Cesium.Color.fromCssColorString(css).withAlpha(alpha); }
+    catch { return Cesium.Color.DODGERBLUE.withAlpha(alpha); }
   }
 
   function getLabelTextFromProps(props){
@@ -448,17 +530,9 @@
   function applyShpStyle(ds){
     const fillCss = $('shpFill')?.value || '#1e90ff';
     const op = clamp01($('shpOpacity')?.value);
-
-    let fill, line, outline;
-    try{
-      fill = Cesium.Color.fromCssColorString(fillCss).withAlpha(op);
-      line = Cesium.Color.fromCssColorString(fillCss).withAlpha(0.9);
-      outline = Cesium.Color.BLACK.withAlpha(0.9);
-    }catch{
-      fill = Cesium.Color.DODGERBLUE.withAlpha(op);
-      line = Cesium.Color.DODGERBLUE.withAlpha(0.9);
-      outline = Cesium.Color.BLACK.withAlpha(0.9);
-    }
+    const fill = safeCssColor(fillCss, op);
+    const line = safeCssColor(fillCss, 0.9);
+    const outline = Cesium.Color.BLACK.withAlpha(0.9);
 
     const now = Cesium.JulianDate.now();
     const ents = ds.entities.values;
@@ -482,7 +556,6 @@
         e.point.disableDepthTestDistance = Number.POSITIVE_INFINITY;
       }
 
-      // label (opsional)
       const props = e.properties ? e.properties.getValue(now) : null;
       const text = getLabelTextFromProps(props);
       if (text){
@@ -503,72 +576,107 @@
     }
   }
 
-  async function clearShp(){
-    if (shpDataSource){
-      viewer.dataSources.remove(shpDataSource, true);
-      shpDataSource = null;
+  function updateLayerListUI(){
+    const box = $('shpLayerList');
+    const items = Array.from(shpLayers.entries());
+
+    if (!items.length){
+      box.innerHTML = `
+        <div class="layerRow">
+          <div></div>
+          <div class="layerMeta">Belum ada layer SHP dimuat.</div>
+          <div></div><div></div>
+        </div>`;
+      return;
     }
+
+    box.innerHTML = items.map(([key, it])=>{
+      const checked = it.ds.show ? 'checked' : '';
+      return `
+        <div class="layerRow" data-key="${key}">
+          <input type="checkbox" ${checked} aria-label="Tampilkan ${it.name}">
+          <div>
+            <div class="layerName" title="${it.name}">${it.name}</div>
+            <div class="layerMeta">${it.count} entity</div>
+          </div>
+          <button class="layerBtn" data-act="zoom">Zoom</button>
+          <button class="layerBtn danger" data-act="remove">Remove</button>
+        </div>`;
+    }).join('');
   }
 
-  async function loadShpFromArrayBuffer(ab, name){
-    await clearShp();
+  async function addGeoJsonAsLayer(geojson, layerName){
+    const ds = await Cesium.GeoJsonDataSource.load(geojson, { clampToGround: true });
+    ds.show = true;
+    viewer.dataSources.add(ds);
+    applyShpStyle(ds);
 
+    const key = `shp_${++shpSeq}`;
+    const count = ds.entities.values.length;
+    shpLayers.set(key, { ds, name: layerName, count });
+    updateLayerListUI();
+
+    return ds;
+  }
+
+  async function loadShpZipArrayBuffer(ab, name){
     if (typeof shp !== 'function'){
       setStatus('SHP loader belum siap (shpjs tidak termuat).');
       return;
     }
 
     setStatus(`Memuat SHP: ${name}\nKonversi ZIP -> GeoJSON...`);
-    const geojson = await shp(ab);
+    const geo = await shp(ab);
 
-    setStatus(`Memuat GeoJSON ke Cesium (clampToGround)...`);
-    shpDataSource = await Cesium.GeoJsonDataSource.load(geojson, { clampToGround: true });
-    viewer.dataSources.add(shpDataSource);
+    // shpjs bisa mengembalikan: object atau array (multi-layer)
+    if (Array.isArray(geo)){
+      let total = 0;
+      for (let i = 0; i < geo.length; i++){
+        const ds = await addGeoJsonAsLayer(geo[i], `${name} (layer ${i+1})`);
+        total += ds.entities.values.length;
+      }
+      setStatus(`SHP dimuat: ${name}\nMulti-layer: ${geo.length}\nTotal entity: ${total}`);
+      return;
+    }
 
-    applyShpStyle(shpDataSource);
-
-    setStatus(`SHP dimuat: ${name}\nEntities: ${shpDataSource.entities.values.length}\nZooming...`);
-    await viewer.zoomTo(shpDataSource);
-    setStatus(`SHP siap: ${name} (Entities: ${shpDataSource.entities.values.length})`);
+    const ds = await addGeoJsonAsLayer(geo, name);
+    setStatus(`SHP dimuat: ${name}\nEntities: ${ds.entities.values.length}`);
   }
 
   async function loadShpFromFile(file){
     if (!file) return;
     const ab = await file.arrayBuffer();
-    await loadShpFromArrayBuffer(ab, file.name);
+    await loadShpZipArrayBuffer(ab, file.name);
   }
 
   async function loadShpFromUrl(url){
     if (!url) return;
     setStatus(`Mengunduh ZIP SHP...\n${url}`);
-    const res = await fetch(url, { cache: 'no-cache' });
-    if (!res.ok){
-      throw new Error(`HTTP ${res.status} saat mengunduh: ${url}`);
-    }
+    const res = await fetch(url, { cache:'no-cache' });
+    if (!res.ok) throw new Error(`HTTP ${res.status} saat mengunduh: ${url}`);
     const ab = await res.arrayBuffer();
-    await loadShpFromArrayBuffer(ab, url);
+    await loadShpZipArrayBuffer(ab, url);
   }
 
-  // hook UI
+  // Hook upload local
   const shpInput = $('shpZipInput');
   const btnLocal = $('btnShpLoadLocal');
-  if (shpInput && btnLocal){
-    shpInput.addEventListener('change', ()=>{
-      btnLocal.disabled = !(shpInput.files && shpInput.files[0]);
-    });
-    btnLocal.addEventListener('click', async ()=>{
-      try{
-        const f = shpInput.files && shpInput.files[0];
-        if (!f) return;
-        await loadShpFromFile(f);
-      }catch(e){
-        console.warn(e);
-        setStatus('Gagal load SHP dari file. Pastikan ZIP berisi shp+shx+dbf (dan prj).');
-      }
-    });
-  }
+  shpInput.addEventListener('change', ()=>{
+    btnLocal.disabled = !(shpInput.files && shpInput.files[0]);
+  });
+  btnLocal.addEventListener('click', async ()=>{
+    try{
+      const f = shpInput.files && shpInput.files[0];
+      if (!f) return;
+      await loadShpFromFile(f);
+    }catch(e){
+      console.warn(e);
+      setStatus('Gagal load SHP dari file. Pastikan ZIP berisi shp+shx+dbf (dan prj).');
+    }
+  });
 
-  $('btnShpLoadUrl')?.addEventListener('click', async ()=>{
+  // Hook load URL
+  $('btnShpLoadUrl').addEventListener('click', async ()=>{
     try{
       const url = $('shpZipUrl').value.trim();
       await loadShpFromUrl(url);
@@ -578,36 +686,74 @@
     }
   });
 
-  $('btnShpQuickSawu')?.addEventListener('click', ()=>{
-    $('shpZipUrl').value = 'SHP%20Sawu.zip';
+  // Quick buttons: pastikan path URL sesuai lokasi file di server Anda
+  $('btnShpQuickSawu').addEventListener('click', ()=>{
+    $('shpZipUrl').value = '/data/SHP%20Sawu.zip';
+    $('btnShpLoadUrl').click();
+  });
+  $('btnShpQuickGili').addEventListener('click', ()=>{
+    $('shpZipUrl').value = '/data/SHP%20Gili_Matra.zip';
+    $('btnShpLoadUrl').click();
+  });
+  $('btnShpQuickAOI').addEventListener('click', ()=>{
+    $('shpZipUrl').value = '/data/AOI%20SHP-20251222T004202Z-3-001.zip';
+    $('btnShpLoadUrl').click();
+  });
+  $('btnShpQuickBuffer').addEventListener('click', ()=>{
+    $('shpZipUrl').value = '/data/Buffer%20SHP-20251222T003919Z-3-001.zip';
     $('btnShpLoadUrl').click();
   });
 
-  $('btnShpQuickGili')?.addEventListener('click', ()=>{
-    $('shpZipUrl').value = 'SHP%20Gili_Matra.zip';
-    $('btnShpLoadUrl').click();
-  });
-
-  $('btnShpClear')?.addEventListener('click', async ()=>{
-    await clearShp();
-    setStatus('Layer SHP dihapus.');
-  });
-
-  $('btnShpZoom')?.addEventListener('click', async ()=>{
-    if (!shpDataSource){
-      setStatus('Belum ada layer SHP.');
-      return;
+  // Re-apply style all layers on change
+  function restyleAll(){
+    for (const it of shpLayers.values()){
+      applyShpStyle(it.ds);
     }
-    await viewer.zoomTo(shpDataSource);
-    setStatus('Zoom ke layer SHP.');
+    setStatus('Style layer SHP diperbarui.');
+  }
+  $('shpFill').addEventListener('input', restyleAll);
+  $('shpOpacity').addEventListener('input', restyleAll);
+
+  // Layer list actions: show/hide, zoom, remove
+  $('shpLayerList').addEventListener('click', async (ev)=>{
+    const row = ev.target.closest('.layerRow');
+    if (!row) return;
+    const key = row.getAttribute('data-key');
+    if (!key || !shpLayers.has(key)) return;
+
+    const it = shpLayers.get(key);
+    const actBtn = ev.target.closest('button[data-act]');
+    if (!actBtn) return;
+
+    const act = actBtn.getAttribute('data-act');
+    if (act === 'zoom'){
+      await viewer.zoomTo(it.ds);
+      setStatus(`Zoom: ${it.name}`);
+    }
+    if (act === 'remove'){
+      viewer.dataSources.remove(it.ds, true);
+      shpLayers.delete(key);
+      updateLayerListUI();
+      setStatus(`Remove: ${it.name}`);
+    }
   });
 
-  $('shpFill')?.addEventListener('input', ()=>{ if (shpDataSource) applyShpStyle(shpDataSource); });
-  $('shpOpacity')?.addEventListener('input', ()=>{ if (shpDataSource) applyShpStyle(shpDataSource); });
-  // ===== [/ADD] SHP Loader =====
+  $('shpLayerList').addEventListener('change', (ev)=>{
+    const row = ev.target.closest('.layerRow');
+    if (!row) return;
+    const key = row.getAttribute('data-key');
+    if (!key || !shpLayers.has(key)) return;
+
+    const it = shpLayers.get(key);
+    const cb = ev.target.closest('input[type="checkbox"]');
+    if (!cb) return;
+
+    it.ds.show = cb.checked;
+    setStatus(`${cb.checked ? 'Tampil' : 'Sembunyi'}: ${it.name}`);
+  });
 
   // Info awal
-  setStatus('Siap. Building tileset ON. Aktifkan AIS untuk ikon Flaticon.');
+  setStatus('Siap. Building tileset ON. Aktifkan AIS untuk ikon Flaticon. Load SHP akan masuk ke Daftar Layer.');
 })();
 </script>
 </body>
