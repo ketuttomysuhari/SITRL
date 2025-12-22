@@ -17,44 +17,20 @@
     --bg:#0b1220; --panel:#0f1a2b; --border:#1f2d44; --text:#e6eef9; --muted:#97a6bf;
     --brand:#0c5adb; --brand-2:#0e7fff; --accent:#1e90ff;
   }
-  html,body,#map{height:100%;margin:0;background:var(--bg);font:14px/1.4 "Inter",system-ui,Segoe UI,Roboto,Arial,sans-serif}
+  html,body,#map{height:100%;margin:0;background:var(--bg);font:14px/1.4 system-ui,Segoe UI,Roboto,Arial,sans-serif}
   #govbar{position:absolute; top:0; left:0; right:0; height:56px; z-index:12; display:flex; align-items:center; gap:10px; padding:0 16px;
     background:linear-gradient(90deg, var(--brand) 0%, var(--brand-2) 100%); color:white; box-shadow:0 2px 10px rgba(0,0,0,.25)}
   #govbar img{height:30px} #govbar h1{font-size:16px;margin:0;font-weight:800}
-
-  /* tombol panel */
-  #panelBtn{
-    margin-left:auto;
-    width:auto;
-    padding:8px 10px;
-    border-radius:10px;
-    border:1px solid rgba(255,255,255,.25);
-    background:rgba(0,0,0,.18);
-    color:#fff;
-    font-weight:800;
-    cursor:pointer;
-  }
+  #panelBtn{margin-left:auto; width:auto; padding:8px 10px; border-radius:10px; border:1px solid rgba(255,255,255,.25);
+    background:rgba(0,0,0,.18); color:#fff; font-weight:800; cursor:pointer;}
 
   #ui{position:absolute; top:68px; left:16px; z-index:10; width:420px; max-height:calc(100% - 84px);
     background:#0b1220cc; border:1px solid var(--border); border-radius:14px; backdrop-filter: blur(6px);
     color:var(--text); overflow:auto; box-shadow:0 8px 28px rgba(0,0,0,.35)}
-
-  /* state hide/unhide panel */
   #ui.hidden{display:none}
-  #panelFab{
-    position:absolute; top:68px; left:16px; z-index:11;
-    display:none;
-    width:auto;
-    padding:10px 12px;
-    border-radius:12px;
-    border:1px solid var(--border);
-    background:#0b1220cc;
-    color:var(--text);
-    font-weight:800;
-    cursor:pointer;
-    backdrop-filter: blur(6px);
-    box-shadow:0 8px 28px rgba(0,0,0,.35);
-  }
+  #panelFab{position:absolute; top:68px; left:16px; z-index:11; display:none; width:auto; padding:10px 12px; border-radius:12px;
+    border:1px solid var(--border); background:#0b1220cc; color:var(--text); font-weight:800; cursor:pointer; backdrop-filter: blur(6px);
+    box-shadow:0 8px 28px rgba(0,0,0,.35);}
   #panelFab.show{display:inline-flex; align-items:center; gap:8px}
 
   .tabs{display:flex; gap:6px; padding:10px 12px; border-bottom:1px solid var(--border)}
@@ -69,7 +45,8 @@
   .btn-ghost{background:#112038; border:1px solid #20324d}
   .row{display:flex; gap:8px} .row>*{flex:1}
   .note{font-size:12px; color:var(--muted)}
-  #status{position:absolute; right:16px; bottom:16px; z-index:5; color:var(--text); background:#0b1220cc; border:1px solid var(--border); border-radius:12px; padding:8px 12px; max-width:520px; font-size:12px}
+  #status{position:absolute; right:16px; bottom:16px; z-index:5; color:var(--text); background:#0b1220cc; border:1px solid var(--border);
+    border-radius:12px; padding:8px 12px; max-width:520px; font-size:12px}
 
   table{width:100%; border-collapse:collapse; margin-top:8px; font-size:13px}
   thead th{position:sticky; top:0; background:#0f2039; border-bottom:1px solid var(--border); text-align:left; padding:8px}
@@ -80,51 +57,35 @@
   input[type="file"]{padding:6px 10px}
   .hr{border:0;border-top:1px solid var(--border); margin:12px 0}
 
-  /* daftar layer */
   .layerList{border:1px solid var(--border); border-radius:12px; overflow:hidden; background:#0f1a2b}
   .layerRow{
     display:grid;
-    grid-template-columns: 22px 1fr 58px 72px;
-    gap:8px;
-    align-items:center;
-    padding:8px 10px;
-    border-bottom:1px solid #16243b;
-    cursor:pointer;
+    grid-template-columns: 22px 1fr 58px 92px 72px;
+    gap:8px; align-items:center;
+    padding:8px 10px; border-bottom:1px solid #16243b; cursor:pointer;
   }
   .layerRow:last-child{border-bottom:0}
   .layerRow:hover{background:#0e1830}
   .layerName{font-size:12px; color:#e6eef9; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
   .layerMeta{font-size:11px; color:var(--muted)}
   .layerBtn{
-    width:100%;
-    padding:6px 8px;
-    border-radius:10px;
-    border:1px solid #20324d;
-    background:#112038;
-    color:var(--text);
-    font-weight:800;
-    cursor:pointer;
+    width:100%; padding:6px 8px; border-radius:10px; border:1px solid #20324d; background:#112038;
+    color:var(--text); font-weight:800; cursor:pointer;
   }
-  .layerBtn.danger{
-    border-color: rgba(231,76,60,.35);
-    background: rgba(231,76,60,.14);
-  }
+  .layerBtn.danger{border-color: rgba(231,76,60,.35); background: rgba(231,76,60,.14);}
 </style>
 </head>
 <body>
 <div id="map"></div>
 
-<!-- Header -->
 <div id="govbar">
   <img src="IMG_0966.png" alt="">
   <div><h1>Ocean Monitoring System</h1></div>
   <button id="panelBtn" type="button">Panel</button>
 </div>
 
-<!-- tombol floating saat panel disembunyikan -->
 <button id="panelFab" type="button" aria-label="Tampilkan Panel">Panel</button>
 
-<!-- Sidebar -->
 <div id="ui" role="region" aria-label="Panel Pengaturan">
   <div class="tabs" role="tablist">
     <div class="tab active" id="tabLayers">Layer</div>
@@ -132,7 +93,6 @@
     <div class="tab" id="tabTentang">Tentang</div>
   </div>
 
-  <!-- LAYER -->
   <div id="paneLayers" class="section">
     <h2>Lapisan Peta</h2>
     <div class="sub">Fokus Indonesia; gunakan fly untuk melihat gedung & kapal.</div>
@@ -157,7 +117,7 @@
 
     <div class="tog">
       <input type="checkbox" id="togAIS" />
-      <label for="togAIS">Posisi Kapal (AIS — ikon Flaticon + label + tabel)</label>
+      <label for="togAIS">Posisi Kapal (AIS — dummy + label + tabel)</label>
     </div>
 
     <hr class="hr">
@@ -190,7 +150,6 @@
       <button id="btnShpQuickGili" class="btn-ghost">Quick: Gili Matra</button>
     </div>
 
-    <!-- AOI DIHAPUS. Buffer tetap ada -->
     <div class="row" style="margin-top:8px">
       <button id="btnShpQuickBuffer" class="btn-ghost">Quick: Buffer</button>
       <button class="btn-ghost" type="button" disabled style="opacity:.55; cursor:not-allowed">AOI (removed)</button>
@@ -214,18 +173,16 @@
 
     <hr class="hr">
     <h2>Daftar Layer SHP</h2>
-    <div class="sub">Centang untuk tampil/sembunyi. Klik baris layer untuk zoom (atau tombol “Zoom”).</div>
+    <div class="sub">Centang untuk tampil/sembunyi. Klik baris layer untuk zoom. Tombol “Metocean” membuat dummy metocean di sekitar extent layer.</div>
     <div id="shpLayerList" class="layerList">
       <div class="layerRow" style="cursor:default">
         <div></div>
         <div class="layerMeta">Belum ada layer SHP dimuat.</div>
-        <div></div>
-        <div></div>
+        <div></div><div></div><div></div>
       </div>
     </div>
   </div>
 
-  <!-- DATA -->
   <div id="paneData" class="section" hidden>
     <h2>Data</h2>
     <div id="aisRealtime">
@@ -244,10 +201,9 @@
     </div>
   </div>
 
-  <!-- TENTANG -->
   <div id="paneTentang" class="section" hidden>
     <h2>Tentang</h2>
-    <p class="note">Dibuat oleh: Dr. Ir. Ketut Tomy Suhari, S.T., M.T., IRSurv. (ITN Malang)</p>
+    <p class="note">Dibuat oleh: Dr. Ir. Ketut Tomy Suhari, S.T., M.T., IRSurv.</p>
   </div>
 </div>
 
@@ -256,7 +212,7 @@
 <script>
 (function(){
   const $ = (id)=>document.getElementById(id);
-  const setStatus = (t)=>{ $('status').textContent = 'Status: ' + t; console.log('[SITARLAUT]', t); };
+  const setStatus = (t)=>{ $('status').textContent = 'Status: ' + t; console.log('[OMS]', t); };
 
   // Panel hide/unhide
   const ui = $('ui');
@@ -268,14 +224,22 @@
   $('panelBtn').addEventListener('click', ()=> setPanelVisible(ui.classList.contains('hidden')));
   fab.addEventListener('click', ()=> setPanelVisible(true));
 
-  // Ion token
-  Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4MGZjYmVlNC01MDEwLTQ3M2ItYTU0Mi00NTljZDMwYTdhYTMiLCJpZCI6NzU1MiwiaWF0IjoxNzYyMjY3NjI0fQ._x11gbiK3ozL9DYz1WVGQDruICGCuTuhZXAglQQh7ZQ';
+  // =========================
+  // [FIX] Ion token (pastikan sebelum Terrain/OSM)
+  // =========================
+  Cesium.Ion.defaultAccessToken =
+    'PASTE_TOKEN_ANDA_DI_SINI'; // <- ganti dengan token Ion Anda (yang valid)
 
   // Viewer
   const viewer = new Cesium.Viewer('map', {
     terrain: Cesium.Terrain.fromWorldTerrain(),
-    animation:false, timeline:false, geocoder:true, baseLayerPicker:false, sceneModePicker:true,
-    infoBox:true, selectionIndicator:true
+    animation:false,
+    timeline:false,
+    geocoder:true,
+    baseLayerPicker:false,
+    sceneModePicker:true,
+    infoBox:true,
+    selectionIndicator:true
   });
   viewer.scene.globe.depthTestAgainstTerrain = false;
 
@@ -295,7 +259,6 @@
       $('togBuildings').checked = false;
     }
   })();
-
   $('togBuildings').addEventListener('change', e=>{
     if (!buildings) { e.target.checked=false; return; }
     buildings.show = e.target.checked;
@@ -326,31 +289,15 @@
     };
   });
 
-  // ===== AIS (dipertahankan dari versi Anda)
-  const SHIP_ICON_PAGE = 'https://www.flaticon.com/free-icon/transport_10956885?term=ship&page=4&position=21&origin=tag&related_id=10956885';
-  const SHIP_ICON_DIRECT = '';
-  const SHIP_FALLBACK_SVG =
+  // =========================
+  // [FIX] AIS dummy (tanpa Flaticon URL yang rawan CORS)
+  // =========================
+  const SHIP_ICON_SVG =
     'data:image/svg+xml;utf8,' +
     encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-      <path d="M8 38l24-10 24 10-6 16H14L8 38z" fill="#1e90ff"/>
-      <path d="M32 10l10 16H22L32 10z" fill="#0c5adb"/>
+      <path d="M8 38l24-10 24 10-6 16H14L8 38z" fill="#f1c40f"/>
+      <path d="M32 10l10 16H22L32 10z" fill="#e67e22"/>
     </svg>`);
-  let shipImage = null;
-  function preloadShipIcon(){
-    return new Promise(res=>{
-      const tryUrl = SHIP_ICON_DIRECT || SHIP_ICON_PAGE;
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = ()=>{ shipImage = img; res(true); };
-      img.onerror = ()=>{
-        const fb = new Image();
-        fb.src = SHIP_FALLBACK_SVG;
-        fb.onload = ()=>{ shipImage = fb; res(false); };
-        fb.onerror = ()=>{ shipImage = null; res(false); };
-      };
-      img.src = tryUrl;
-    });
-  }
 
   let aisTimer=null, aisBillboards=null, aisHasFlown=false, aisSelection=null;
   let DEMO_SHIPS = [];
@@ -411,8 +358,8 @@
     for (const v of ships){
       aisBillboards.add({
         position: Cesium.Cartesian3.fromDegrees(v.lon, v.lat),
-        image: shipImage || SHIP_FALLBACK_SVG,
-        scale: 0.09,
+        image: SHIP_ICON_SVG,
+        scale: 0.10,
         verticalOrigin: Cesium.VerticalOrigin.CENTER,
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
         disableDepthTestDistance: Number.POSITIVE_INFINITY
@@ -470,14 +417,13 @@
     renderAisTable(DEMO_SHIPS);
     if (!aisHasFlown && DEMO_SHIPS.length){ aisHasFlown = true; flyToAISExtent(DEMO_SHIPS); }
   }
-  async function startAIS(){
-    await preloadShipIcon();
+  function startAIS(){
     seedDemoShips();
     fetchAISOnce();
-    stopAIS();
+    stopAIS(); // reset timer & layer first
     aisTimer = setInterval(fetchAISOnce, 2000);
     $('togAIS').checked = true;
-    setStatus('AIS berjalan (ikon Flaticon).');
+    setStatus('AIS berjalan (dummy).');
   }
   function stopAIS(){
     if (aisTimer){ clearInterval(aisTimer); aisTimer=null; }
@@ -485,20 +431,22 @@
     clearAisLabels();
     if (aisSelection){ viewer.entities.remove(aisSelection); aisSelection=null; }
     renderAisTable([]);
-    $('togAIS').checked = false;
     setStatus('AIS dimatikan.');
   }
   $('togAIS').addEventListener('change', e=> e.target.checked ? startAIS() : stopAIS());
   $('btnAisFlyAll').onclick = ()=>{ if (DEMO_SHIPS.length) flyToAISExtent(DEMO_SHIPS); };
-  $('btnAisStop').onclick = ()=> stopAIS();
+  $('btnAisStop').onclick = ()=>{ $('togAIS').checked=false; stopAIS(); };
   $('aisTableBody').addEventListener('click', (ev)=>{
     const btn = ev.target.closest('[data-goto]'); if (!btn) return;
     const id = btn.getAttribute('data-goto');
     const ship = DEMO_SHIPS.find(s=>s.id===id); if (ship) focusShip(ship);
   });
 
-  // ===== SHP MULTI-LAYER MANAGER
-  const shpLayers = new Map(); // key -> { ds, name, count }
+  // =========================
+  // SHP MULTI-LAYER MANAGER + METOCEAN DUMMY
+  // =========================
+  const shpLayers = new Map();      // key -> { ds, name, count }
+  const meteoLayers = new Map();    // key -> CustomDataSource
   let shpSeq = 0;
 
   function clamp01(v){
@@ -510,7 +458,6 @@
     try { return Cesium.Color.fromCssColorString(css).withAlpha(alpha); }
     catch { return Cesium.Color.DODGERBLUE.withAlpha(alpha); }
   }
-
   function getLabelTextFromProps(props){
     if (!props) return '';
     const keys = ['NAME','Name','name','NAMA','nama'];
@@ -521,7 +468,6 @@
     }
     return '';
   }
-
   function applyShpStyle(ds){
     const fillCss = $('shpFill')?.value || '#1e90ff';
     const op = clamp01($('shpOpacity')?.value);
@@ -530,9 +476,7 @@
     const outline = Cesium.Color.BLACK.withAlpha(0.9);
 
     const now = Cesium.JulianDate.now();
-    const ents = ds.entities.values;
-
-    for (const e of ents){
+    for (const e of ds.entities.values){
       if (e.polygon){
         e.polygon.material = fill;
         e.polygon.outline = true;
@@ -550,7 +494,6 @@
         e.point.outlineWidth = 2;
         e.point.disableDepthTestDistance = Number.POSITIVE_INFINITY;
       }
-
       const props = e.properties ? e.properties.getValue(now) : null;
       const text = getLabelTextFromProps(props);
       if (text){
@@ -571,6 +514,140 @@
     }
   }
 
+  // ---- bbox from datasource to seed metocean around SHP
+  function computeBboxFromDataSource(ds){
+    let west=  180, east= -180, south=  90, north= -90;
+    let has=false;
+    const now = Cesium.JulianDate.now();
+
+    for (const e of ds.entities.values){
+      const positions = [];
+
+      if (e.position){
+        const p = e.position.getValue(now);
+        if (p) positions.push(p);
+      }
+      if (e.polyline && e.polyline.positions){
+        const arr = e.polyline.positions.getValue(now);
+        if (Array.isArray(arr)) positions.push(...arr);
+      }
+      if (e.polygon && e.polygon.hierarchy){
+        const h = e.polygon.hierarchy.getValue(now);
+        if (h && Array.isArray(h.positions)) positions.push(...h.positions);
+      }
+
+      for (const p of positions){
+        const c = Cesium.Cartographic.fromCartesian(p);
+        const lon = Cesium.Math.toDegrees(c.longitude);
+        const lat = Cesium.Math.toDegrees(c.latitude);
+        if (!Number.isFinite(lon) || !Number.isFinite(lat)) continue;
+        has=true;
+        west = Math.min(west, lon);
+        east = Math.max(east, lon);
+        south = Math.min(south, lat);
+        north = Math.max(north, lat);
+      }
+    }
+    if (!has) return null;
+
+    // buffer 5%
+    const dx = Math.max(0.01, (east - west) * 0.05);
+    const dy = Math.max(0.01, (north - south) * 0.05);
+
+    return {
+      west: west - dx,
+      east: east + dx,
+      south: south - dy,
+      north: north + dy
+    };
+  }
+  function rrand(a,b){ return a + Math.random()*(b-a); }
+  function makeMeteoReading(){
+    return {
+      sst: rrand(25.0, 31.0),
+      hs:  rrand(0.3,  2.5),
+      tp:  rrand(4.0,  12.0),
+      wd:  rrand(0,    360),
+      ws:  rrand(0.5,  15.0),
+      wa:  rrand(0,    360)
+    };
+  }
+  function meteoLabel(r){
+    return [
+      `SST: ${r.sst.toFixed(1)} °C`,
+      `Hs: ${r.hs.toFixed(2)} m | Tp: ${r.tp.toFixed(1)} s`,
+      `Wind: ${r.ws.toFixed(1)} m/s @ ${Math.round(r.wa)}°`,
+      `Wave dir: ${Math.round(r.wd)}°`
+    ].join('\n');
+  }
+  function buildMeteoDataSource(bbox, title, count){
+    const ds = new Cesium.CustomDataSource(title);
+    for (let i=0;i<count;i++){
+      const lon = rrand(bbox.west, bbox.east);
+      const lat = rrand(bbox.south, bbox.north);
+      const r = makeMeteoReading();
+      ds.entities.add({
+        name: `Metocean-${i+1}`,
+        position: Cesium.Cartesian3.fromDegrees(lon, lat, 0),
+        point: {
+          pixelSize: 8,
+          color: Cesium.Color.CYAN.withAlpha(0.9),
+          outlineColor: Cesium.Color.BLACK.withAlpha(0.9),
+          outlineWidth: 1,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY
+        },
+        label: {
+          text: meteoLabel(r),
+          font: '11px sans-serif',
+          fillColor: Cesium.Color.WHITE,
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 2,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          showBackground: true,
+          backgroundColor: new Cesium.Color(0,0,0,0.55),
+          backgroundPadding: new Cesium.Cartesian2(6,4),
+          pixelOffset: new Cesium.Cartesian2(0, -18),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY
+        },
+        properties: {
+          sst: r.sst, hs: r.hs, tp: r.tp,
+          wave_dir: r.wd, wind_speed_10m: r.ws, wind_dir: r.wa
+        }
+      });
+    }
+    return ds;
+  }
+  async function toggleMeteoForLayer(key){
+    const layer = shpLayers.get(key);
+    if (!layer) return;
+
+    // create if missing
+    if (!meteoLayers.has(key)){
+      const bbox = computeBboxFromDataSource(layer.ds);
+      if (!bbox){
+        setStatus('Metocean dummy gagal: bbox tidak ditemukan.');
+        return;
+      }
+      const meteoDs = buildMeteoDataSource(bbox, `Metocean (Dummy) — ${layer.name}`, 30);
+      meteoDs.show = true;
+      viewer.dataSources.add(meteoDs);
+      meteoLayers.set(key, meteoDs);
+      setStatus(`Metocean dummy dibuat untuk: ${layer.name}`);
+      return;
+    }
+
+    // toggle show
+    const ds = meteoLayers.get(key);
+    ds.show = !ds.show;
+    setStatus(`${ds.show ? 'Tampilkan' : 'Sembunyikan'} metocean: ${layer.name}`);
+  }
+  function removeMeteoForLayer(key){
+    const ds = meteoLayers.get(key);
+    if (!ds) return;
+    try { viewer.dataSources.remove(ds, true); } catch {}
+    meteoLayers.delete(key);
+  }
+
   function updateLayerListUI(){
     const box = $('shpLayerList');
     const items = Array.from(shpLayers.entries());
@@ -580,7 +657,7 @@
         <div class="layerRow" style="cursor:default">
           <div></div>
           <div class="layerMeta">Belum ada layer SHP dimuat.</div>
-          <div></div><div></div>
+          <div></div><div></div><div></div>
         </div>`;
       return;
     }
@@ -595,6 +672,7 @@
             <div class="layerMeta">${it.count} entity</div>
           </div>
           <button class="layerBtn" data-act="zoom" type="button">Zoom</button>
+          <button class="layerBtn" data-act="meteo" type="button">Metocean</button>
           <button class="layerBtn danger" data-act="remove" type="button">Remove</button>
         </div>`;
     }).join('');
@@ -611,7 +689,6 @@
     shpLayers.set(key, { ds, name: layerName, count });
     updateLayerListUI();
 
-    // Setelah add: langsung zoom ke layer baru (agar terasa "klik shp -> zoom")
     try { await viewer.zoomTo(ds); } catch {}
     return ds;
   }
@@ -621,11 +698,9 @@
       setStatus('SHP loader belum siap (shpjs tidak termuat).');
       return;
     }
-
     setStatus(`Memuat SHP: ${name}\nKonversi ZIP -> GeoJSON...`);
     const geo = await shp(ab);
 
-    // shpjs bisa mengembalikan: object atau array (multi-layer)
     if (Array.isArray(geo)){
       let total = 0;
       for (let i = 0; i < geo.length; i++){
@@ -645,7 +720,6 @@
     const ab = await file.arrayBuffer();
     await loadShpZipArrayBuffer(ab, file.name);
   }
-
   async function loadShpFromUrl(url){
     if (!url) return;
     setStatus(`Mengunduh ZIP SHP...\n${url}`);
@@ -655,12 +729,10 @@
     await loadShpZipArrayBuffer(ab, url);
   }
 
-  // Hook upload local
+  // Upload local
   const shpInput = $('shpZipInput');
   const btnLocal = $('btnShpLoadLocal');
-  shpInput.addEventListener('change', ()=>{
-    btnLocal.disabled = !(shpInput.files && shpInput.files[0]);
-  });
+  shpInput.addEventListener('change', ()=>{ btnLocal.disabled = !(shpInput.files && shpInput.files[0]); });
   btnLocal.addEventListener('click', async ()=>{
     try{
       const f = shpInput.files && shpInput.files[0];
@@ -672,7 +744,7 @@
     }
   });
 
-  // Hook load URL
+  // Load URL
   $('btnShpLoadUrl').addEventListener('click', async ()=>{
     try{
       const url = $('shpZipUrl').value.trim();
@@ -683,7 +755,7 @@
     }
   });
 
-  // Quick buttons (AOI dihapus)
+  // Quick buttons
   $('btnShpQuickSawu').addEventListener('click', ()=>{
     $('shpZipUrl').value = 'SHP%20Sawu.zip';
     $('btnShpLoadUrl').click();
@@ -697,38 +769,45 @@
     $('btnShpLoadUrl').click();
   });
 
-  // Re-apply style all layers on change
+  // Restyle all
   function restyleAll(){
-    for (const it of shpLayers.values()){
-      applyShpStyle(it.ds);
-    }
+    for (const it of shpLayers.values()) applyShpStyle(it.ds);
     setStatus('Style layer SHP diperbarui.');
   }
   $('shpFill').addEventListener('input', restyleAll);
   $('shpOpacity').addEventListener('input', restyleAll);
 
-  // Layer list actions:
-  // - Checkbox: show/hide
-  // - Klik baris (selain tombol/checkbox): zoom ke layer
-  // - Tombol Zoom: zoom
-  // - Tombol Remove: hapus
-  $('shpLayerList').addEventListener('click', async (ev)=>{
+  // [FIX] Checkbox dipisah ke event change agar tidak bentrok dengan click-to-zoom
+  $('shpLayerList').addEventListener('change', (ev)=>{
     const row = ev.target.closest('.layerRow');
     if (!row) return;
     const key = row.getAttribute('data-key');
     if (!key || !shpLayers.has(key)) return;
 
     const it = shpLayers.get(key);
+    const checked = ev.target.checked;
+    it.ds.show = checked;
 
-    // Checkbox toggle
-    const cb = ev.target.closest('input[type="checkbox"]');
-    if (cb){
-      it.ds.show = cb.checked;
-      setStatus(`${it.ds.show ? 'Tampil' : 'Sembunyi'}: ${it.name}`);
-      return;
-    }
+    // ikut hide metocean jika layer dimatikan (rapih)
+    const m = meteoLayers.get(key);
+    if (m && !checked) m.show = false;
 
-    // Button action
+    setStatus(`${checked ? 'Tampil' : 'Sembunyi'}: ${it.name}`);
+  });
+
+  // Click row actions
+  $('shpLayerList').addEventListener('click', async (ev)=>{
+    const row = ev.target.closest('.layerRow');
+    if (!row) return;
+
+    const key = row.getAttribute('data-key');
+    if (!key || !shpLayers.has(key)) return;
+    const it = shpLayers.get(key);
+
+    // If checkbox clicked, ignore here (handled by change)
+    if (ev.target && ev.target.tagName === 'INPUT') return;
+
+    // Button actions
     const actBtn = ev.target.closest('button[data-act]');
     if (actBtn){
       const act = actBtn.getAttribute('data-act');
@@ -737,7 +816,12 @@
         setStatus(`Zoom: ${it.name}`);
         return;
       }
+      if (act === 'meteo'){
+        await toggleMeteoForLayer(key);
+        return;
+      }
       if (act === 'remove'){
+        removeMeteoForLayer(key);
         viewer.dataSources.remove(it.ds, true);
         shpLayers.delete(key);
         updateLayerListUI();
@@ -746,12 +830,12 @@
       }
     }
 
-    // Default: klik baris => zoom (ini yang Anda minta)
+    // Default click row -> zoom
     await viewer.zoomTo(it.ds);
     setStatus(`Zoom: ${it.name}`);
   });
 
-  setStatus('Siap. Upload/Load SHP untuk melihat layer dan klik baris layer untuk zoom.');
+  setStatus('Siap. Tempel token Ion Anda pada bagian "PASTE_TOKEN_ANDA_DI_SINI".');
 })();
 </script>
 </body>
